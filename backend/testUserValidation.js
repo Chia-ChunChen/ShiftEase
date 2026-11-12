@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const User = require("./models/User");
 
 const testCases = [
@@ -9,7 +10,7 @@ const testCases = [
       password: "TestPassword123",
       role: "Manager"
     },
-    shouldPass: true
+    expectedErrorPath: null
   },
   {
     name: "Missing name",
@@ -18,7 +19,7 @@ const testCases = [
       password: "TestPassword123",
       role: "Manager"
     },
-    shouldPass: false
+    expectedErrorPath: "name"
   },
   {
     name: "Missing email",
@@ -27,7 +28,7 @@ const testCases = [
       password: "TestPassword123",
       role: "Manager"
     },
-    shouldPass: false
+    expectedErrorPath: "email"
   },
   {
     name: "Missing password",
@@ -36,7 +37,7 @@ const testCases = [
       email: "test@example.com",
       role: "Manager"
     },
-    shouldPass: false
+    expectedErrorPath: "password"
   },
   {
     name: "Invalid user role",
@@ -46,7 +47,37 @@ const testCases = [
       password: "TestPassword123",
       role: "Guest"
     },
-    shouldPass: false
+    expectedErrorPath: "role"
+  },
+  {
+    name: "Invalid email format",
+    data: {
+      name: "Test User",
+      email: "not-an-email",
+      password: "TestPassword123",
+      role: "Employee"
+    },
+    expectedErrorPath: "email"
+  },
+  {
+    name: "Administrator role is allowed",
+    data: {
+      name: "Test Admin",
+      email: "admin@example.com",
+      password: "TestPassword123",
+      role: "Administrator"
+    },
+    expectedErrorPath: null
+  },
+  {
+    name: "Employee role is allowed",
+    data: {
+      name: "Test Employee",
+      email: "employee@example.com",
+      password: "TestPassword123",
+      role: "Employee"
+    },
+    expectedErrorPath: null
   }
 ];
 
@@ -55,22 +86,43 @@ async function runTests() {
 
   for (const test of testCases) {
     const user = new User(test.data);
-    let actualPass = true;
 
     try {
       await user.validate();
-    } catch (error) {
-      actualPass = false;
-    }
 
-    if (actualPass === test.shouldPass) {
+      if (test.expectedErrorPath !== null) {
+        console.log(
+          `FAIL: ${test.name} - Expected ${test.expectedErrorPath} error`
+        );
+        continue;
+      }
+
       console.log(`PASS: ${test.name}`);
       passed++;
-    } else {
-      console.log(`FAIL: ${test.name}`);
+    } catch (error) {
+      if (!(error instanceof mongoose.Error.ValidationError)) {
+        console.log(`FAIL: ${test.name} - Unexpected error: ${error.message}`);
+        continue;
+      }
+
+      if (test.expectedErrorPath === null) {
+        console.log(`FAIL: ${test.name} - Unexpected validation error`);
+        continue;
+      }
+
+      if (!error.errors[test.expectedErrorPath]) {
+        console.log(
+          `FAIL: ${test.name} - Expected ${test.expectedErrorPath} error`
+        );
+        continue;
+      }
+
+      console.log(`PASS: ${test.name}`);
+      passed++;
     }
   }
 
+  // Test email lowercase conversion
   const emailUser = new User({
     name: "Test User",
     email: "TEST@EXAMPLE.COM",
@@ -85,8 +137,8 @@ async function runTests() {
     console.log("FAIL: Email lowercase conversion");
   }
 
-  const passwordSelected =
-    User.schema.path("password").options.select;
+  // Test password is excluded from normal queries
+  const passwordSelected = User.schema.path("password").options.select;
 
   if (passwordSelected === false) {
     console.log("PASS: Password excluded from normal queries");
@@ -95,9 +147,26 @@ async function runTests() {
     console.log("FAIL: Password selection protection");
   }
 
-  console.log(`\nResult: ${passed}/7 tests passed`);
+  // Test password is excluded from JSON serialization
+  const jsonUser = new User({
+    name: "JSON Test User",
+    email: "json@example.com",
+    password: "TestPassword123",
+    role: "Employee"
+  });
 
-  if (passed !== 7) {
+  const jsonResult = JSON.parse(JSON.stringify(jsonUser));
+
+  if (jsonResult.password === undefined) {
+    console.log("PASS: toJSON does not expose password");
+    passed++;
+  } else {
+    console.log("FAIL: toJSON exposes password");
+  }
+
+  console.log(`\nResult: ${passed}/11 tests passed`);
+
+  if (passed !== 11) {
     process.exitCode = 1;
   }
 }
