@@ -1,4 +1,3 @@
-
 const mongoose = require("mongoose");
 
 const availabilitySchema = new mongoose.Schema(
@@ -16,12 +15,24 @@ const availabilitySchema = new mongoose.Schema(
 
     startTime: {
       type: String,
-      required: true
+      required: true,
+      match: /^([01]\d|2[0-3]):[0-5]\d$/
     },
 
     endTime: {
       type: String,
-      required: true
+      required: true,
+      match: /^([01]\d|2[0-3]):[0-5]\d$/,
+      validate: {
+        validator: function (value) {
+          if (!this.startTime || !value) {
+            return true;
+          }
+
+          return value > this.startTime;
+        },
+        message: "End time must be later than start time."
+      }
     }
   },
   {
