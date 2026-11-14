@@ -4,6 +4,9 @@ const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
+const scheduleRoutes = require("./routes/scheduleRoutes");
+const availabilityRoutes = require("./routes/availabilityRoutes");
+const employeeRoutes = require("./routes/employeeRoutes");
 
 const app = express();
 
@@ -20,6 +23,9 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/users", userRoutes);
+app.use("/api/schedules", scheduleRoutes);
+app.use("/api/availability", availabilityRoutes);
+app.use("/api/employees", employeeRoutes);
 
 const PORT = process.env.PORT || 5000;
 
