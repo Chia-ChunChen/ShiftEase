@@ -1,9 +1,11 @@
+
 require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
+const availabilityRoutes = require("./routes/availabilityRoutes");
 
 const app = express();
 
@@ -20,6 +22,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/users", userRoutes);
+app.use("/api/availability", availabilityRoutes);
 
 const PORT = process.env.PORT || 5000;
 
