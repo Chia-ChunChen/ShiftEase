@@ -3,7 +3,6 @@ import { ROLES } from './roles.js';
 // Route and role map for the next navigation step. These paths are not wired yet.
 export const ROUTES = Object.freeze({
   LOGIN: '/login',
-  SIGNUP: '/signup',
   ADMIN_HOME: '/admin',
   MANAGER_HOME: '/manager',
   NEW_EMPLOYEE: '/manager/employees/new',
@@ -16,7 +15,6 @@ export const ROUTES = Object.freeze({
 
 export const PUBLIC_ROUTES = Object.freeze([
   ROUTES.LOGIN,
-  ROUTES.SIGNUP,
 ]);
 
 export const ROUTE_ACCESS = Object.freeze({
