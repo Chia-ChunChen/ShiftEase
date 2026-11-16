@@ -1,0 +1,213 @@
+.availability-page {
+  display: grid;
+  gap: 24px;
+}
+
+.availability-page__header {
+  display: grid;
+  gap: 6px;
+}
+
+.availability-page__header h1,
+.availability-page__header p {
+  margin: 0;
+}
+
+.availability-page__eyebrow {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.availability-calendar {
+  display: grid;
+  gap: 24px;
+  width: 100%;
+  max-width: 980px;
+  padding: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.availability-calendar__navigation {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.availability-calendar__navigation h2 {
+  margin: 0;
+  text-align: center;
+  font-size: 18px;
+}
+
+.availability-calendar__navigation button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.availability-calendar__navigation button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.availability-calendar__days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.availability-calendar__day {
+  min-height: 96px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.availability-calendar__day span {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.availability-calendar__day strong {
+  font-size: 24px;
+}
+
+.availability-calendar__day:hover {
+  border-color: var(--color-primary);
+}
+
+.availability-calendar__day.is-selected {
+  border-color: var(--color-primary);
+  color: #fff;
+  background: var(--color-primary);
+}
+
+.availability-calendar__day.is-selected span {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.availability-calendar__day:focus-visible,
+.availability-calendar__navigation button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.availability-calendar__selection {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+.availability-details {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  max-width: 980px;
+}
+
+.availability-details > header h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.availability-details > header p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.availability-details__list {
+  display: grid;
+  gap: 12px;
+}
+
+.availability-date-card {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.availability-date-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.availability-date-card__times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.availability-date-card .form-field {
+  display: grid;
+  gap: 8px;
+}
+
+.availability-date-card label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.availability-date-card input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.availability-date-card input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .availability-date-card__times {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .availability-calendar {
+    padding: 20px;
+  }
+
+  .availability-calendar__days {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .availability-calendar__navigation {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .availability-calendar__navigation h2 {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .availability-calendar__days {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
