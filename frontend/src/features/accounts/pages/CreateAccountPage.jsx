@@ -3,7 +3,7 @@ import FeedbackMessage from '../../../shared/components/FeedbackMessage.jsx'
 import { validateTemporaryPassword } from '../accountValidation.js'
 import './CreateAccountPage.css'
 
-function CreateAccountPage() {
+function CreateAccountPage({ saveFeedback = null }) {
   const [feedback, setFeedback] = useState({
     variant: '',
     message: '',
@@ -81,6 +81,11 @@ function CreateAccountPage() {
         <FeedbackMessage variant={feedback.variant}>
           {feedback.message}
         </FeedbackMessage>
+        {saveFeedback && (
+          <FeedbackMessage variant={saveFeedback.variant}>
+            {saveFeedback.message}
+          </FeedbackMessage>
+        )}
 
         <div className="account-form__actions">
           <button className="button button--secondary" type="reset">

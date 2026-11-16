@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './NewSchedulePage.css'
+import FeedbackMessage from '../../../shared/components/FeedbackMessage.jsx'
 
 const weekdayFormatter = new Intl.DateTimeFormat('en-US', {
   weekday: 'short',
@@ -45,7 +46,7 @@ function getWeekDates(weekOffset) {
   )
 }
 
-function NewSchedulePage() {
+function NewSchedulePage({ saveFeedback = null }) {
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedDates, setSelectedDates] = useState([])
   const [shiftHours, setShiftHours] = useState({})
@@ -180,6 +181,10 @@ function NewSchedulePage() {
               </article>
             )
           })}
+
+          <FeedbackMessage variant={saveFeedback?.variant}>
+            {saveFeedback?.message}
+          </FeedbackMessage>
 
           <button className="button button--primary" type="button">
             Save weekly schedule
