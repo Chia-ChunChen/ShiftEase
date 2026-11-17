@@ -1,0 +1,19 @@
+:root {
+  --color-primary: #0f5b50;
+  --color-primary-hover: #0a473f;
+  --color-accent: #2e7468;
+
+  --color-background: #f5f7f6;
+  --color-surface: #ffffff;
+  --color-text: #17211e;
+  --color-text-muted: #68756f;
+  --color-border: #d9e2de;
+
+  --color-success: #2e7d5b;
+  --color-warning: #a76514;
+  --color-danger: #b42318;
+
+  --font-family: "Segoe UI", Arial, sans-serif;
+  --radius-card: 14px;
+  --shadow-card: 0 8px 24px rgba(14, 51, 46, 0.08);
+}

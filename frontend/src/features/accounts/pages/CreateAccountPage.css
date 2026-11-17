@@ -1,0 +1,108 @@
+.account-page {
+  display: grid;
+  gap: 24px;
+}
+
+.account-page .page-header {
+  display: grid;
+  gap: 6px;
+}
+
+.account-page .page-header h1,
+.account-page .page-header p {
+  margin: 0;
+}
+
+.account-page .page-eyebrow {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.account-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  padding: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.account-form .form-field {
+  display: grid;
+  gap: 8px;
+}
+
+.account-form label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.account-form input,
+.account-form select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.account-form input:focus-visible,
+.account-form select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.account-form__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.account-form .button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.account-form .button--primary {
+  color: #fff;
+  background: var(--color-primary);
+}
+
+.account-form .button--primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.account-form .button--secondary {
+  border-color: var(--color-border);
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+@media (max-width: 640px) {
+  .account-form {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+
+  .account-form__actions {
+    grid-column: auto;
+    flex-direction: column-reverse;
+  }
+
+  .account-form__actions .button {
+    width: 100%;
+  }
+}
