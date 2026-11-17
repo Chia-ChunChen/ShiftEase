@@ -39,7 +39,8 @@ const scheduleSchema = new mongoose.Schema(
 
   },
   {
-    timestamps: true
+    timestamps: true,
+    optimisticConcurrency: true
   }
 );
 

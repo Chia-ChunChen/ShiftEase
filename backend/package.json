@@ -6,7 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "create-staff": "node scripts/createStaffAccount.js",
+    "test:integration": "node --test tests/workflows.test.js"
   },
   "keywords": [],
   "author": "",

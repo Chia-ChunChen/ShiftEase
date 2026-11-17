@@ -3,9 +3,13 @@ const express = require("express");
 const router = express.Router();
 
 const scheduleController = require("../controllers/scheduleController");
+const { requireSession, allowRoles } = require("../middleware/auth");
+
+router.use(requireSession, allowRoles("Manager", "Administrator"));
 
 // Create a schedule
 router.post("/", scheduleController.createSchedule);
+router.post("/weekly", scheduleController.createWeeklySchedule);
 
 // Get all schedules
 router.get("/", scheduleController.getAllSchedules);

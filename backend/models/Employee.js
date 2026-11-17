@@ -10,6 +10,9 @@ const employeeSchema = new mongoose.Schema(
       sparse: true
     },
 
+    scheduleRevision: { type: Number, select: false },
+    availabilityRevision: { type: Number, select: false },
+
     name: {
       type: String,
       required: true,

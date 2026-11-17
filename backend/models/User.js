@@ -24,6 +24,16 @@ const userSchema = new mongoose.Schema(
       select: false
     },
 
+    mustChangePassword: {
+      type: Boolean,
+      default: false
+    },
+
+    sessionVersion: {
+      type: Number,
+      default: 0
+    },
+
     role: {
       type: String,
       enum: ["Administrator", "Manager", "Employee"],
@@ -38,6 +48,7 @@ const userSchema = new mongoose.Schema(
 userSchema.set("toJSON", {
   transform: (doc, ret) => {
     delete ret.password;
+    delete ret.sessionVersion;
     return ret;
   }
 });

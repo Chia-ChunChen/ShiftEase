@@ -1,390 +1,199 @@
-
+const mongoose = require("mongoose");
 const Schedule = require("../models/Schedule");
 const Employee = require("../models/Employee");
 const Availability = require("../models/Availability");
-const mongoose = require("mongoose");
+const httpError = require("../lib/httpError");
 
-// Create a new schedule
-const createSchedule = async (scheduleData) => {
-  const { shiftDate, startTime, endTime } = scheduleData;
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-  // Check required fields
-  if (!shiftDate || !startTime || !endTime) {
-    throw new Error("All fields are required.");
+function parseDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw httpError(400, "Invalid date format. Use YYYY-MM-DD.");
   }
-
-  // Validate date (YYYY-MM-DD)
-  if (
-    typeof shiftDate !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(shiftDate)
-  ) {
-    throw new Error("Invalid date format. Use YYYY-MM-DD.");
+  const date = new Date(value + "T00:00:00.000Z");
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    throw httpError(400, "Invalid shift date.");
   }
-
-  const date = new Date(`${shiftDate}T00:00:00.000Z`);
-
-  if (
-    Number.isNaN(date.getTime()) ||
-    date.toISOString().slice(0, 10) !== shiftDate
-  ) {
-    throw new Error("Invalid shift date.");
-  }
-
-  // Validate time (HH:mm)
-  const timeFormat = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-  if (
-    typeof startTime !== "string" ||
-    typeof endTime !== "string" ||
-    !timeFormat.test(startTime) ||
-    !timeFormat.test(endTime)
-  ) {
-    throw new Error("Invalid time format. Use HH:mm.");
-  }
-
-  // End time must be after start time
-  if (endTime <= startTime) {
-    throw new Error("End time must be after start time.");
-  }
-
-  // Save schedule to MongoDB
-  const newSchedule = await Schedule.create({
-    shiftDate: date,
-    startTime,
-    endTime,
-    employees: []
-  });
-
-  return newSchedule;
-};
-
-
- // Get all schedules
-const getAllSchedules = async () => {
-  const schedules = await Schedule.find()
-    .populate("employees")
-    .sort({ shiftDate: 1, startTime: 1 });
-
-  return schedules;
-};
-
-
-
- // Update an existing schedule
-const updateSchedule = async (scheduleId, updateData) => {
-  const schedule = await Schedule.findById(scheduleId);
-
-  if (!schedule) {
-    return null;
-  }
-
-  const { shiftDate, startTime, endTime } = updateData;
-
-  if (
-    shiftDate === undefined &&
-    startTime === undefined &&
-    endTime === undefined
-  ) {
-    throw new Error("No schedule fields provided.");
-  }
-
-  // Update shift date
-  if (shiftDate !== undefined) {
-    if (
-      typeof shiftDate !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(shiftDate)
-    ) {
-      throw new Error("Invalid date format. Use YYYY-MM-DD.");
-    }
-
-    const date = new Date(`${shiftDate}T00:00:00.000Z`);
-
-    if (
-      Number.isNaN(date.getTime()) ||
-      date.toISOString().slice(0, 10) !== shiftDate
-    ) {
-      throw new Error("Invalid shift date.");
-    }
-
-    schedule.shiftDate = date;
-  }
-
-  // Validate time format
-  const timeFormat = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-  if (startTime !== undefined) {
-    if (
-      typeof startTime !== "string" ||
-      !timeFormat.test(startTime)
-    ) {
-      throw new Error("Invalid time format. Use HH:mm.");
-    }
-
-    schedule.startTime = startTime;
-  }
-
-  if (endTime !== undefined) {
-    if (
-      typeof endTime !== "string" ||
-      !timeFormat.test(endTime)
-    ) {
-      throw new Error("Invalid time format. Use HH:mm.");
-    }
-
-    schedule.endTime = endTime;
-  }
-
-  // Validate the updated time range
-  if (schedule.endTime <= schedule.startTime) {
-    throw new Error("End time must be after start time.");
-  }
-
-  // Save changes to MongoDB
-  await schedule.save();
-
-  return schedule;
-};
-
-
- // Assign an employee to a schedule
-const assignEmployee = async (scheduleId, employeeId) => {
-  const mongoose = require("mongoose");
-
-  // Validate IDs
-  if (!mongoose.isValidObjectId(scheduleId) ||
-      !mongoose.isValidObjectId(employeeId)) {
-    throw new Error("Invalid schedule or employee ID.");
-  }
-
-  // Find schedule
-  const schedule = await Schedule.findById(scheduleId);
-
-  if (!schedule) {
-    return null;
-  }
-
-  // Find employee
-  const employee = await Employee.findById(employeeId);
-
-  if (!employee) {
-    throw new Error("Employee not found.");
-  }
-
-  // Prevent duplicate assignments
-  const alreadyAssigned = schedule.employees.some(
-    id => id.toString() === employeeId
-  );
-
-  if (alreadyAssigned) {
-    throw new Error("Employee already assigned.");
-  }
-
-  // Check for overlapping shifts
-  const conflictingSchedule = await Schedule.exists({
-    _id: { $ne: schedule._id },
-    shiftDate: schedule.shiftDate,
-    employees: employee._id,
-    startTime: { $lt: schedule.endTime },
-    endTime: { $gt: schedule.startTime }
-  });
-
-  if (conflictingSchedule) {
-    throw new Error("Employee has a conflicting shift.");
-  }
-
- // Check employee availability before assignment
-const availableEmployees =
-  await getAvailableEmployees(scheduleId);
-
-const isAvailable = availableEmployees.some(
-  availableEmployee =>
-    availableEmployee._id.toString() === employeeId
-);
-
-if (!isAvailable) {
-  throw new Error(
-    "Employee is not available for this shift."
-  );
+  return date;
 }
 
-
-  // Assign employee
-  schedule.employees.push(employee._id);
-
-  // Save to MongoDB
-  await schedule.save();
-
-  return await schedule.populate("employees");
-};
-
-
- // Publish a schedule
-const publishSchedule = async (scheduleId) => {
-  const mongoose = require("mongoose");
-
-  // Validate schedule ID
-  if (!mongoose.isValidObjectId(scheduleId)) {
-    throw new Error("Invalid schedule ID.");
+function validateTimes(startTime, endTime) {
+  if (typeof startTime !== "string" || typeof endTime !== "string" ||
+      !TIME.test(startTime) || !TIME.test(endTime)) {
+    throw httpError(400, "Invalid time format. Use HH:mm.");
   }
+  if (endTime <= startTime) throw httpError(400, "End time must be after start time.");
+}
 
-  // Find schedule
-  const schedule = await Schedule.findById(scheduleId);
+function newShift(data) {
+  const { shiftDate, startTime, endTime } = data ?? {};
+  if (!shiftDate || !startTime || !endTime) throw httpError(400, "All fields are required.");
+  const date = parseDate(shiftDate);
+  validateTimes(startTime, endTime);
+  return { shiftDate: date, startTime, endTime, employees: [] };
+}
 
-  if (!schedule) {
-    return null;
+async function createSchedule(data) {
+  return Schedule.create(newShift(data));
+}
+
+async function createWeeklySchedule(entries) {
+  if (!Array.isArray(entries) || !entries.length || entries.length > 7) {
+    throw httpError(400, "Select one to seven shift dates.");
   }
-
-  // Check if already published
-  if (schedule.status === "published") {
-    throw new Error("Schedule is already published.");
+  const shifts = entries.map(newShift);
+  if (new Set(shifts.map(shift => shift.shiftDate.getTime())).size !== shifts.length) {
+    throw httpError(400, "Enter one shift per date in the weekly form.");
   }
+  await Schedule.init();
+  return mongoose.connection.transaction(session => Schedule.insertMany(shifts, { session }));
+}
 
-  // Validate schedule information
-  if (
-    !schedule.shiftDate ||
-    !schedule.startTime ||
-    !schedule.endTime
-  ) {
-    throw new Error("Schedule information is incomplete.");
-  }
+async function getAllSchedules() {
+  return Schedule.find().populate("employees").sort({ shiftDate: 1, startTime: 1 });
+}
 
-  // Validate time range
-  if (schedule.endTime <= schedule.startTime) {
-    throw new Error("Invalid schedule time range.");
-  }
+function dayRange(shiftDate) {
+  const start = new Date(shiftDate);
+  start.setUTCHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { $gte: start, $lt: end };
+}
 
-  // Update publish status
-  schedule.status = "published";
-  schedule.publishedAt = new Date();
+function conflictFilter(shift) {
+  return {
+    _id: { $ne: shift._id },
+    shiftDate: dayRange(shift.shiftDate),
+    startTime: { $lt: shift.endTime },
+    endTime: { $gt: shift.startTime }
+  };
+}
 
-  // Save to MongoDB
-  await schedule.save();
+function availabilityFilter(shift) {
+  return {
+    availableDate: dayRange(shift.shiftDate),
+    startTime: { $lte: shift.startTime },
+    endTime: { $gte: shift.endTime }
+  };
+}
 
-  return schedule;
-};
-
- // Remove an employee from a schedule
-const removeEmployee = async (scheduleId, employeeId) => {
-  const mongoose = require("mongoose");
-
-  // Validate IDs
-  if (
-    !mongoose.isValidObjectId(scheduleId) ||
-    !mongoose.isValidObjectId(employeeId)
-  ) {
-    throw new Error("Invalid schedule or employee ID.");
-  }
-
-  // Find schedule
-  const schedule = await Schedule.findById(scheduleId);
-
-  if (!schedule) {
-    return null;
-  }
-
-  // Check if employee is assigned
-  const isAssigned = schedule.employees.some(
-    id => id.toString() === employeeId
+async function validateAssignments(shift, employeeIds, session) {
+  if (!employeeIds.length) return;
+  // Serialize assignments touching the same employee across concurrent shifts.
+  const employees = await Employee.updateMany(
+    { _id: { $in: employeeIds } },
+    { $inc: { scheduleRevision: 1 } },
+    { session, timestamps: false }
   );
-
-  if (!isAssigned) {
-    throw new Error("Employee is not assigned to this shift.");
+  if (employees.matchedCount !== employeeIds.length) {
+    throw httpError(409, "An assigned employee no longer exists.");
   }
-
-  // Remove employee
-  schedule.employees = schedule.employees.filter(
-    id => id.toString() !== employeeId
-  );
-
-  // Save changes
-  await schedule.save();
-
-  return await schedule.populate("employees");
-};
-
-
- // Get employees available for a selected shift
-const getAvailableEmployees = async (scheduleId) => {
-
-  // Validate Schedule ID
-  if (!mongoose.isValidObjectId(scheduleId)) {
-    throw new Error("Invalid schedule ID.");
+  const conflict = await Schedule.exists({
+    ...conflictFilter(shift), employees: { $in: employeeIds }
+  }).session(session);
+  if (conflict) throw httpError(409, "An assigned employee has a conflicting shift.");
+  const available = await Availability.find({
+    ...availabilityFilter(shift), employee: { $in: employeeIds }
+  }).select("employee").session(session);
+  if (new Set(available.map(record => record.employee.toString())).size !== employeeIds.length) {
+    throw httpError(409, "An assigned employee is not available for this shift.");
   }
+}
 
-  // Find selected schedule
-  const schedule = await Schedule.findById(scheduleId);
+function requireId(id, message) {
+  if (!mongoose.isObjectIdOrHexString(id)) throw httpError(400, message);
+}
 
-  if (!schedule) {
-    throw new Error("Schedule not found.");
+async function updateSchedule(scheduleId, updateData) {
+  requireId(scheduleId, "Invalid schedule ID.");
+  const { shiftDate, startTime, endTime } = updateData ?? {};
+  if (shiftDate === undefined && startTime === undefined && endTime === undefined) {
+    throw httpError(400, "No schedule fields provided.");
   }
-
-  // Calculate the selected UTC date range
-  const startDate = new Date(schedule.shiftDate);
-  startDate.setUTCHours(0, 0, 0, 0);
-
-  const nextDate = new Date(startDate);
-  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
-
-  // Find employees available during the entire shift
-  const availabilityRecords = await Availability.find({
-    availableDate: {
-      $gte: startDate,
-      $lt: nextDate
-    },
-    startTime: { $lte: schedule.startTime },
-    endTime: { $gte: schedule.endTime }
+  return mongoose.connection.transaction(async session => {
+    const schedule = await Schedule.findById(scheduleId).session(session);
+    if (!schedule) return null;
+    const next = {
+      _id: schedule._id,
+      shiftDate: shiftDate === undefined ? schedule.shiftDate : parseDate(shiftDate),
+      startTime: startTime === undefined ? schedule.startTime : startTime,
+      endTime: endTime === undefined ? schedule.endTime : endTime
+    };
+    validateTimes(next.startTime, next.endTime);
+    await validateAssignments(next, schedule.employees, session);
+    schedule.set({ shiftDate: next.shiftDate, startTime: next.startTime, endTime: next.endTime });
+    return schedule.save({ session });
   });
+}
 
-  const availableIds = [
-    ...new Set(
-      availabilityRecords
-        .map(record => record.employee?.toString())
-        .filter(Boolean)
-    )
-  ];
-
-  if (availableIds.length === 0) {
-    return [];
-  }
-
-  // Find conflicting schedules
-  const conflictingSchedules = await Schedule.find({
-    _id: { $ne: schedule._id },
-    shiftDate: schedule.shiftDate,
-    employees: { $in: availableIds },
-    startTime: { $lt: schedule.endTime },
-    endTime: { $gt: schedule.startTime }
+async function assignEmployee(scheduleId, employeeId) {
+  const message = "Invalid schedule or employee ID.";
+  requireId(scheduleId, message);
+  requireId(employeeId, message);
+  return mongoose.connection.transaction(async session => {
+    const schedule = await Schedule.findById(scheduleId).session(session);
+    if (!schedule) return null;
+    const employee = await Employee.findById(employeeId).session(session);
+    if (!employee) throw httpError(404, "Employee not found.");
+    if (schedule.employees.some(id => id.equals(employee._id))) {
+      throw httpError(409, "Employee already assigned.");
+    }
+    await validateAssignments(schedule, [employee._id], session);
+    schedule.employees.push(employee._id);
+    await schedule.save({ session });
+    return schedule.populate({ path: "employees", options: { session } });
   });
+}
 
-  const busyEmployeeIds = new Set(
-    conflictingSchedules.flatMap(s =>
-      s.employees.map(id => id.toString())
-    )
-  );
+async function publishSchedule(scheduleId) {
+  requireId(scheduleId, "Invalid schedule ID.");
+  return mongoose.connection.transaction(async session => {
+    const schedule = await Schedule.findById(scheduleId).session(session);
+    if (!schedule) return null;
+    if (schedule.status === "published") throw httpError(409, "Schedule is already published.");
+    if (!schedule.shiftDate) throw httpError(400, "Schedule information is incomplete.");
+    validateTimes(schedule.startTime, schedule.endTime);
+    await validateAssignments(schedule, schedule.employees, session);
+    schedule.status = "published";
+    schedule.publishedAt = new Date();
+    return schedule.save({ session });
+  });
+}
 
-  const assignedEmployeeIds = new Set(
-    schedule.employees.map(id => id.toString())
-  );
+async function removeEmployee(scheduleId, employeeId) {
+  const message = "Invalid schedule or employee ID.";
+  requireId(scheduleId, message);
+  requireId(employeeId, message);
+  const schedule = await Schedule.findById(scheduleId);
+  if (!schedule) return null;
+  const targetId = new mongoose.Types.ObjectId(employeeId);
+  const assigned = schedule.employees.filter(id => !id.equals(targetId));
+  if (assigned.length === schedule.employees.length) {
+    throw httpError(409, "Employee is not assigned to this shift.");
+  }
+  schedule.employees = assigned;
+  await schedule.save();
+  return schedule.populate("employees");
+}
 
-  // Exclude busy or already assigned employees
-  const eligibleIds = availableIds.filter(id =>
-    !busyEmployeeIds.has(id) &&
-    !assignedEmployeeIds.has(id)
-  );
-
-  // Return available employees
-  return await Employee.find({
-    _id: { $in: eligibleIds }
-  }).sort({ name: 1 });
-};
-
+async function getAvailableEmployees(scheduleId) {
+  requireId(scheduleId, "Invalid schedule ID.");
+  const schedule = await Schedule.findById(scheduleId);
+  if (!schedule) throw httpError(404, "Schedule not found.");
+  const available = await Availability.distinct("employee", availabilityFilter(schedule));
+  const assigned = new Set(schedule.employees.map(id => id.toString()));
+  const candidates = available.filter(id => !assigned.has(id.toString()));
+  if (!candidates.length) return [];
+  const busy = await Schedule.distinct("employees", {
+    ...conflictFilter(schedule), employees: { $in: candidates }
+  });
+  const busyIds = new Set(busy.map(id => id.toString()));
+  return Employee.find({ _id: { $in: candidates.filter(id => !busyIds.has(id.toString())) } })
+    .sort({ name: 1 });
+}
 
 module.exports = {
-  createSchedule,
-  getAllSchedules,
-  updateSchedule,
-  assignEmployee,
-  publishSchedule,
-  removeEmployee,
-  getAvailableEmployees
+  createSchedule, createWeeklySchedule, getAllSchedules, updateSchedule,
+  assignEmployee, publishSchedule, removeEmployee, getAvailableEmployees
 };
