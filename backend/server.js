@@ -6,6 +6,8 @@ const cors = require("cors");
 const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
 const availabilityRoutes = require("./routes/availabilityRoutes");
+const employeeRoutes = require("./routes/employeeRoutes");
+const administratorRoutes = require("./routes/administratorRoutes");
 
 const app = express();
 
@@ -23,6 +25,8 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/users", userRoutes);
 app.use("/api/availability", availabilityRoutes);
+app.use("/api/employees", employeeRoutes);
+app.use("/api/admin", administratorRoutes);
 
 const PORT = process.env.PORT || 5000;
 
