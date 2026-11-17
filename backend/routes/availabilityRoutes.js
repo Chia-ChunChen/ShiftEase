@@ -1,10 +1,14 @@
 
 const express = require("express");
+
+const {
+  createAvailabilityController,
+  getAllAvailability
+} = require("../controllers/availabilityController");
+
 const router = express.Router();
 
-const availabilityController = require("../controllers/availabilityController");
-
-// Get all employee availability
-router.get("/", availabilityController.getAllAvailability);
+router.get("/", getAllAvailability);
+router.post("/", createAvailabilityController);
 
 module.exports = router;
