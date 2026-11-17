@@ -75,4 +75,4 @@ async function provisionAccount(details) {
   });
 }
 
-module.exports = { provisionEmployee, provisionAccount };
+module.exports = { inAccountTransaction, provisionEmployee, provisionAccount };

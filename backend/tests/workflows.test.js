@@ -3,6 +3,7 @@ const { once } = require("node:events");
 const { randomUUID } = require("node:crypto");
 const { after, before, test } = require("node:test");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
 const app = require("../app");
 const Employee = require("../models/Employee");
 const User = require("../models/User");
@@ -13,6 +14,7 @@ const { createUser } = require("../services/userService");
 const mongoUri = process.env.TEST_MONGO_URI;
 let server;
 let base;
+const jwtSecret = randomUUID();
 
 if (!mongoUri) {
   test("ShiftEase workflows", { skip: "Set TEST_MONGO_URI to a local MongoDB replica set." }, () => {});
@@ -22,6 +24,7 @@ if (!mongoUri) {
     assert.equal(url.protocol, "mongodb:");
     assert.ok(["localhost", "127.0.0.1"].includes(url.hostname), "Use a local test server only.");
     await mongoose.connect(mongoUri, { dbName: "shiftease_test_" + randomUUID().replaceAll("-", "") });
+    process.env.JWT_SECRET = jwtSecret;
     server = app.listen(0, "127.0.0.1");
     await once(server, "listening");
     base = "http://127.0.0.1:" + server.address().port;
@@ -33,10 +36,11 @@ if (!mongoUri) {
     await mongoose.disconnect();
   });
 
-  async function request(path, { method = "GET", cookie, body, origin } = {}) {
+  async function request(path, { method = "GET", cookie, token, body, origin } = {}) {
     const headers = {};
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (cookie) headers.Cookie = cookie;
+    if (token) headers.Authorization = "Bearer " + token;
     if (origin) headers.Origin = origin;
     const response = await fetch(base + path, { method, headers, body: JSON.stringify(body) });
     const data = response.status === 204 ? null : await response.json();
@@ -62,16 +66,22 @@ if (!mongoUri) {
     assert.equal((await request("/api/employees", { method: "POST", body: employeeDetails("person@example.test") })).status, 401);
     assert.equal((await request("/api/users", { method: "POST", body: employeeDetails("person@example.test") })).status, 401);
     assert.equal((await request("/api/schedules")).status, 401);
-    const admin = cookieFrom(await login("admin@example.test", initial));
+    const adminLogin = await login("admin@example.test", initial);
+    const admin = cookieFrom(adminLogin);
+    const adminToken = adminLogin.data.token;
+    assert.equal(jwt.verify(adminToken, jwtSecret).role, "Administrator");
+    assert.equal((await request("/api/admin/users", { token: adminToken })).status, 200);
+    assert.equal((await request("/api/admin/users", { cookie: admin })).status, 200);
     const manager = cookieFrom(await login(" MANAGER@example.test ", initial));
     assert.equal((await request("/api/users", { cookie: manager })).status, 403);
+    assert.equal((await request("/api/admin/users", { cookie: manager })).status, 403);
     assert.equal((await request("/api/users", { cookie: admin })).status, 200);
     assert.equal((await request("/api/employees", {
       method: "POST", cookie: manager, origin: "https://unrelated.example", body: employeeDetails("person@example.test")
     })).status, 403);
 
-    const preexisting = await request("/api/users", {
-      method: "POST", cookie: admin, body: { ...employeeDetails("person@example.test"), role: "Employee" }
+    const preexisting = await request("/api/admin/users", {
+      method: "POST", token: adminToken, body: { ...employeeDetails("person@example.test"), role: "Employee" }
     });
     assert.equal(preexisting.status, 201, JSON.stringify(preexisting.data));
     const preexistingHash = (await User.findById(preexisting.data.user._id).select("+password")).password;
@@ -114,7 +124,9 @@ if (!mongoUri) {
     const unavailableId = linked.data.data._id;
 
     const oldSession = cookieFrom(await login("new@example.test", temp));
-    const otherSession = cookieFrom(await login("new@example.test", temp));
+    const otherLogin = await login("new@example.test", temp);
+    const otherSession = cookieFrom(otherLogin);
+    assert.equal(otherLogin.data.employeeId, newAccount.data.data._id);
     const profile = await request("/api/users/me", { cookie: oldSession });
     assert.equal(profile.data.user.mustChangePassword, true);
     assert.equal(profile.data.employee._id, newAccount.data.data._id);
@@ -123,9 +135,16 @@ if (!mongoUri) {
       method: "PUT", cookie: oldSession, body: { currentPassword: temp, newPassword: initial }
     })).status, 204);
     assert.equal((await request("/api/users/me", { cookie: otherSession })).status, 401);
+    assert.equal((await request("/api/users/me", { token: otherLogin.data.token })).status, 401);
     assert.equal((await login("new@example.test", temp)).status, 401);
     const employee = cookieFrom(await login("new@example.test", initial));
     assert.equal((await request("/api/schedules", { cookie: employee })).status, 403);
+    assert.equal((await request("/api/employees/me", { cookie: employee })).data.employee._id, newAccount.data.data._id);
+    assert.equal((await request("/api/employees", { cookie: employee })).status, 403);
+    assert.ok((await request("/api/employees", { cookie: manager })).data.count >= 3);
+    const employeePath = "/api/employees/" + newAccount.data.data._id;
+    assert.equal((await request(employeePath, { method: "PUT", cookie: manager, body: { position: "Senior Cashier" } })).status, 200);
+    assert.equal((await request(employeePath, { method: "PUT", cookie: manager, body: { email: "moved@example.test" } })).status, 409);
 
     const date = "2026-11-18";
     const span = (availableDate, startTime, endTime) => ({ availableDate, startTime, endTime, employee: unavailableId });
@@ -179,5 +198,33 @@ if (!mongoUri) {
     assert.equal(published.data?.data?.status, "published");
     assert.equal((await request("/api/users/logout", { method: "POST", cookie: employee })).status, 204);
     assert.equal((await request("/api/users/me", { cookie: employee })).status, 401);
+
+    const legacyID = legacyUser.data.user._id;
+    const adminDetail = "/api/admin/users/" + legacyID;
+    const oldLegacy = await login("legacy@example.test", legacyUser.data.temporaryPassword);
+    assert.equal((await request(adminDetail, { token: adminToken })).data.user._id, legacyID);
+    const updated = await request(adminDetail, {
+      method: "PUT", token: adminToken, body: { name: "Renamed", email: "renamed@example.test", role: "Employee" }
+    });
+    assert.equal(updated.status, 200, JSON.stringify(updated.data));
+    assert.equal((await Employee.findById(legacy._id)).email, "renamed@example.test");
+    assert.equal((await request("/api/users/me", { token: oldLegacy.data.token })).status, 401);
+    const roleChange = await request(adminDetail, {
+      method: "PUT", cookie: admin, body: { name: "Renamed", email: "renamed@example.test", role: "Manager" }
+    });
+    assert.equal(roleChange.status, 409);
+    assert.equal((await request(adminDetail, { method: "DELETE", token: adminToken })).status, 200);
+    assert.equal((await Employee.findById(legacy._id)).user, undefined);
+    assert.equal((await request(adminDetail, { token: adminToken })).status, 404);
+
+    const logoutSession = await login("manager@example.test", initial);
+    const logoutCookie = cookieFrom(logoutSession);
+    assert.equal((await request("/api/users/logout", { method: "POST", token: logoutSession.data.token })).status, 204);
+    assert.equal((await request("/api/users/me", { cookie: logoutCookie })).status, 401);
+
+    delete process.env.JWT_SECRET;
+    const cookieOnlyLogin = await login("manager@example.test", initial);
+    assert.equal(cookieOnlyLogin.data.token, undefined);
+    assert.equal((await request("/api/schedules", { cookie: cookieFrom(cookieOnlyLogin) })).status, 200);
   });
 }

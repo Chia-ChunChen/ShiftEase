@@ -16,8 +16,16 @@ async function login(req, res) {
   const { email, password } = req.body ?? {};
   const user = await authenticate(email, password);
   if (!user) return res.status(401).json({ message: "Invalid email or password." });
-  await startSession(res, user);
-  return res.json({ user: toSafeUser(user) });
+  const employee = user.role === "Employee"
+    ? await Employee.findOne({ user: user._id }).select("_id")
+    : null;
+  const token = await startSession(res, user);
+  return res.json({
+    message: "Login successful.",
+    user: { ...toSafeUser(user), id: user._id },
+    employeeId: employee?._id ?? null,
+    token
+  });
 }
 
 async function logout(req, res) {

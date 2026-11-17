@@ -4,6 +4,7 @@ const userRoutes = require("./routes/userRoutes");
 const scheduleRoutes = require("./routes/scheduleRoutes");
 const availabilityRoutes = require("./routes/availabilityRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
+const administratorRoutes = require("./routes/administratorRoutes");
 
 const app = express();
 const frontendOrigin = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
@@ -33,6 +34,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/availability", availabilityRoutes);
 app.use("/api/employees", employeeRoutes);
+app.use("/api/admin", administratorRoutes);
 
 app.use("/api", (req, res) => {
   res.status(404).json({ message: "API route not found." });

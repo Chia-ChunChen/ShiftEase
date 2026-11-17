@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 
 const employeeSchema = new mongoose.Schema(
   {
+    // Link Employee to User account
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
