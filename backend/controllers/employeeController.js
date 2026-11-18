@@ -1,124 +1,87 @@
-
 const mongoose = require("mongoose");
 const Employee = require("../models/Employee");
+const employeeService = require("../services/employeeService");
+const { inAccountTransaction } = require("../services/provisioningService");
+const { normalizeEmail } = require("../services/userService");
+const httpError = require("../lib/httpError");
 
-// GET all employees
-const getAllEmployees = async (req, res) => {
+async function createEmployee(req, res) {
   try {
-    const employees = await Employee.find();
-
-    return res.status(200).json({
-      message: "Employees retrieved successfully.",
-      count: employees.length,
-      employees
+    const { employee, temporaryPassword } = await employeeService.createEmployee(req.body);
+    return res.status(201).json({
+      success: true,
+      message: temporaryPassword ? "Employee and login account created." : "Employee linked to the existing account.",
+      data: employee,
+      temporaryPassword
     });
   } catch (error) {
-    console.error("Get all employees error:", error);
-
-    return res.status(500).json({
-      message: "Failed to retrieve employees."
-    });
+    if (error.statusCode || error.name === "ValidationError") {
+      return res.status(error.statusCode || 400).json({ success: false, message: error.message });
+    }
+    console.error("Create employee error:", error.name);
+    return res.status(500).json({ success: false, message: "Failed to create employee." });
   }
-};
+}
 
-// GET my employee profile
-const getMyEmployeeProfile = async (req, res) => {
+async function getAllEmployees(req, res) {
+  const employees = await Employee.find().sort({ name: 1 });
+  return res.json({ message: "Employees retrieved successfully.", count: employees.length, employees });
+}
+
+function employeeResponse(res, employee, message) {
+  if (!employee) return res.status(404).json({ message: "Employee profile not found." });
+  return res.json({ message, employee });
+}
+
+async function getMyEmployeeProfile(req, res) {
+  const employee = await Employee.findOne({ user: req.user._id });
+  return employeeResponse(res, employee, "Employee profile retrieved successfully.");
+}
+
+async function getEmployeeProfile(req, res) {
+  if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+    return res.status(400).json({ message: "Invalid employee ID." });
+  }
+  return employeeResponse(res, await Employee.findById(req.params.id), "Employee profile retrieved successfully.");
+}
+
+async function updateEmployeeProfile(req, res) {
+  const { id } = req.params;
+  if (!mongoose.isObjectIdOrHexString(id)) return res.status(400).json({ message: "Invalid employee ID." });
+
+  const { name, email, phone, position } = req.body ?? {};
+  const values = { name, email, phone, position };
+  for (const [field, value] of Object.entries(values)) {
+    if (value === undefined) delete values[field];
+    else if (typeof value !== "string" || !value.trim()) {
+      return res.status(400).json({ message: `Enter a valid ${field}.` });
+    }
+  }
+  if (!Object.keys(values).length) return res.status(400).json({ message: "Provide an employee field to update." });
+  if (email !== undefined) {
+    values.email = normalizeEmail(email);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
+      return res.status(400).json({ message: "Invalid email address." });
+    }
+  }
+
   try {
-    const employee = await Employee.findOne({
-      user: req.user.userId
+    const employee = await inAccountTransaction(async session => {
+      const record = await Employee.findById(id).session(session);
+      if (!record) return null;
+      if (record.user && values.email !== undefined && values.email !== record.email) {
+        throw httpError(409, "Change the linked email through Administrator account management.");
+      }
+      record.set(values);
+      return record.save({ session });
     });
-
-    if (!employee) {
-      return res.status(404).json({
-        message: "Employee profile not found."
-      });
-    }
-
-    return res.status(200).json({
-      message: "Employee profile retrieved successfully.",
-      employee
-    });
+    return employeeResponse(res, employee, "Employee profile updated successfully.");
   } catch (error) {
-    console.error("Get my employee profile error:", error);
-
-    return res.status(500).json({
-      message: "Failed to retrieve employee profile."
-    });
+    if (error.statusCode || error.name === "ValidationError") {
+      return res.status(error.statusCode || 400).json({ message: error.message });
+    }
+    throw error;
   }
-};
+}
 
-// GET employee by ID
-const getEmployeeProfile = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        message: "Invalid employee ID."
-      });
-    }
-
-    const employee = await Employee.findById(id);
-
-    if (!employee) {
-      return res.status(404).json({
-        message: "Employee not found."
-      });
-    }
-
-    return res.status(200).json({
-      message: "Employee profile retrieved successfully.",
-      employee
-    });
-  } catch (error) {
-    console.error("Get employee profile error:", error);
-
-    return res.status(500).json({
-      message: "Failed to retrieve employee profile."
-    });
-  }
-};
-
-// PUT update employee profile
-const updateEmployeeProfile = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, email, phone, position } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        message: "Invalid employee ID."
-      });
-    }
-
-    const employee = await Employee.findByIdAndUpdate(
-      id,
-      { name, email, phone, position },
-      { new: true, runValidators: true }
-    );
-
-    if (!employee) {
-      return res.status(404).json({
-        message: "Employee not found."
-      });
-    }
-
-    return res.status(200).json({
-      message: "Employee profile updated successfully.",
-      employee
-    });
-  } catch (error) {
-    console.error("Update employee profile error:", error);
-
-    return res.status(400).json({
-      message: "Failed to update employee profile."
-    });
-  }
-};
-
-module.exports = {
-  getAllEmployees,
-  getMyEmployeeProfile,
-  getEmployeeProfile,
-  updateEmployeeProfile
-};
+module.exports = { createEmployee, getAllEmployees, getMyEmployeeProfile, getEmployeeProfile, updateEmployeeProfile };

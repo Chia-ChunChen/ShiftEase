@@ -1,48 +1,15 @@
-
 const express = require("express");
+const controller = require("../controllers/employeeController");
+const { requireSession, allowRoles } = require("../middleware/auth");
+
 const router = express.Router();
+const staff = allowRoles("Manager", "Administrator");
 
-const {
-  getAllEmployees,
-  getMyEmployeeProfile,
-  getEmployeeProfile,
-  updateEmployeeProfile
-} = require("../controllers/employeeController");
-
-const {
-  authenticateUser,
-  authorizeRoles
-} = require("../middleware/authMiddleware");
-
-// All routes require login
-router.use(authenticateUser);
-
-// Employee gets own profile
-router.get(
-  "/me",
-  authorizeRoles("Employee"),
-  getMyEmployeeProfile
-);
-
-// Only Administrator and Manager can view all employees
-router.get(
-  "/",
-  authorizeRoles("Administrator", "Manager"),
-  getAllEmployees
-);
-
-// Only Administrator and Manager can view employee by ID
-router.get(
-  "/:id",
-  authorizeRoles("Administrator", "Manager"),
-  getEmployeeProfile
-);
-
-// Only Administrator and Manager can update employee
-router.put(
-  "/:id",
-  authorizeRoles("Administrator", "Manager"),
-  updateEmployeeProfile
-);
+router.use(requireSession);
+router.get("/me", allowRoles("Employee"), controller.getMyEmployeeProfile);
+router.get("/", staff, controller.getAllEmployees);
+router.get("/:id", staff, controller.getEmployeeProfile);
+router.put("/:id", staff, controller.updateEmployeeProfile);
+router.post("/", staff, controller.createEmployee);
 
 module.exports = router;

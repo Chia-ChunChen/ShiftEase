@@ -1,4 +1,4 @@
-export function validateTemporaryPassword(password) {
+export function validatePassword(password) {
   if (typeof password !== 'string') {
     return 'Enter a temporary password.'
   }

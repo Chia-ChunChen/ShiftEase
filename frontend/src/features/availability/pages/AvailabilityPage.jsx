@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import FeedbackMessage from '../../../shared/components/FeedbackMessage.jsx'
+import { useWeeklySave } from '../../../shared/hooks/useWeeklySave.js'
 import './AvailabilityPage.css'
 
 const weekdayFormatter = new Intl.DateTimeFormat('en-US', {
@@ -46,10 +48,18 @@ function getWeekDates(weekOffset) {
 }
 
 function AvailabilityPage() {
+  const { saving, feedback, save } = useWeeklySave('/api/availability/weekly', 'availableDate')
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedDates, setSelectedDates] = useState([])
   const weekDates = getWeekDates(weekOffset)
   const [hoursByDate, setHoursByDate] = useState({})
+
+  async function saveAvailability() {
+    if (await save(selectedDates, hoursByDate)) {
+      setSelectedDates([])
+      setHoursByDate({})
+    }
+  }
 
   function toggleDate(date) {
     const dateKey = getDateKey(date)
@@ -59,7 +69,6 @@ function AvailabilityPage() {
         ? currentDates.filter((selectedDate) => selectedDate !== dateKey)
         : [...currentDates, dateKey].sort(),
     )
-    
   }
 
   function updateHours(dateKey, field, value) {
@@ -90,7 +99,7 @@ function AvailabilityPage() {
 
       <section className="availability-calendar" aria-label="Weekly calendar">
         <div className="availability-calendar__navigation">
-          <button type="button" onClick={() => changeWeek(-1)}>
+          <button type="button" disabled={saving} onClick={() => changeWeek(-1)}>
             Previous week
           </button>
 
@@ -100,7 +109,7 @@ function AvailabilityPage() {
             {monthDayFormatter.format(weekDates[6])}
           </h2>
 
-          <button type="button" onClick={() => changeWeek(1)}>
+          <button type="button" disabled={saving} onClick={() => changeWeek(1)}>
             Next week
           </button>
         </div>
@@ -115,6 +124,7 @@ function AvailabilityPage() {
                 key={dateKey}
                 className={`availability-calendar__day${isSelected ? ' is-selected' : ''}`}
                 type="button"
+                disabled={saving}
                 aria-pressed={isSelected}
                 aria-label={`${fullDateFormatter.format(date)}${
                   isSelected ? ', selected' : ''
@@ -164,6 +174,7 @@ function AvailabilityPage() {
                           id={`${dateKey}-start`}
                           name={`${dateKey}.startTime`}
                           type="time"
+                          disabled={saving}
                           value={hours.startTime}
                           onChange={(event) =>
                             updateHours(dateKey, 'startTime', event.target.value)
@@ -178,6 +189,7 @@ function AvailabilityPage() {
                           id={`${dateKey}-end`}
                           name={`${dateKey}.endTime`}
                           type="time"
+                          disabled={saving}
                           value={hours.endTime}
                           onChange={(event) =>
                             updateHours(dateKey, 'endTime', event.target.value)
@@ -192,6 +204,10 @@ function AvailabilityPage() {
             </div>
           </section>
         )}
+        <FeedbackMessage variant={feedback?.variant}>{feedback?.message}</FeedbackMessage>
+        <button className="button button--primary" type="button" disabled={saving || !selectedDates.length} onClick={saveAvailability}>
+          {saving ? 'Saving…' : 'Save availability'}
+        </button>
       </section>
     </section>
   )

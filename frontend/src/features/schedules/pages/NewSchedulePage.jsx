@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import './NewSchedulePage.css'
 import FeedbackMessage from '../../../shared/components/FeedbackMessage.jsx'
+import { useWeeklySave } from '../../../shared/hooks/useWeeklySave.js'
 
 const weekdayFormatter = new Intl.DateTimeFormat('en-US', {
   weekday: 'short',
@@ -46,11 +47,19 @@ function getWeekDates(weekOffset) {
   )
 }
 
-function NewSchedulePage({ saveFeedback = null }) {
+function NewSchedulePage() {
+  const { saving, feedback, save } = useWeeklySave('/api/schedules/weekly', 'shiftDate')
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedDates, setSelectedDates] = useState([])
   const [shiftHours, setShiftHours] = useState({})
   const weekDates = getWeekDates(weekOffset)
+
+  async function saveSchedule() {
+    if (await save(selectedDates, shiftHours)) {
+      setSelectedDates([])
+      setShiftHours({})
+    }
+  }
 
   function toggleDate(date) {
     const dateKey = getDateKey(date)
@@ -88,7 +97,7 @@ function NewSchedulePage({ saveFeedback = null }) {
       <div className="schedule-page__layout">
         <section className="schedule-calendar" aria-label="Weekly calendar">
           <div className="schedule-calendar__navigation">
-            <button type="button" onClick={() => changeWeek(-1)}>
+            <button type="button" disabled={saving} onClick={() => changeWeek(-1)}>
               Previous week
             </button>
 
@@ -98,7 +107,7 @@ function NewSchedulePage({ saveFeedback = null }) {
               {monthDayFormatter.format(weekDates[6])}
             </h2>
 
-            <button type="button" onClick={() => changeWeek(1)}>
+            <button type="button" disabled={saving} onClick={() => changeWeek(1)}>
               Next week
             </button>
           </div>
@@ -113,6 +122,7 @@ function NewSchedulePage({ saveFeedback = null }) {
                   key={dateKey}
                   className={`schedule-calendar__day${isSelected ? ' is-selected' : ''}`}
                   type="button"
+                  disabled={saving}
                   aria-pressed={isSelected}
                   aria-label={`${fullDateFormatter.format(date)}${
                     isSelected ? ', selected' : ''
@@ -151,6 +161,7 @@ function NewSchedulePage({ saveFeedback = null }) {
                     <input
                       id={`${dateKey}-start`}
                       type="time"
+                      disabled={saving}
                       value={hours.startTime}
                       onChange={(event) =>
                         updateShiftHours(
@@ -167,6 +178,7 @@ function NewSchedulePage({ saveFeedback = null }) {
                     <input
                       id={`${dateKey}-end`}
                       type="time"
+                      disabled={saving}
                       value={hours.endTime}
                       onChange={(event) =>
                         updateShiftHours(
@@ -182,12 +194,12 @@ function NewSchedulePage({ saveFeedback = null }) {
             )
           })}
 
-          <FeedbackMessage variant={saveFeedback?.variant}>
-            {saveFeedback?.message}
+          <FeedbackMessage variant={feedback?.variant}>
+            {feedback?.message}
           </FeedbackMessage>
 
-          <button className="button button--primary" type="button">
-            Save weekly schedule
+          <button className="button button--primary" type="button" disabled={saving || !selectedDates.length} onClick={saveSchedule}>
+            {saving ? 'Saving…' : 'Save weekly schedule'}
           </button>
         </section>
 

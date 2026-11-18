@@ -1,31 +1,41 @@
 import { useState } from 'react'
 import FeedbackMessage from '../../../shared/components/FeedbackMessage.jsx'
-import { validateTemporaryPassword } from '../accountValidation.js'
+import { validatePassword } from '../accountValidation.js'
+import { postJson } from '../../../shared/services/apiClient.js'
+import TemporaryCredentials from '../components/TemporaryCredentials.jsx'
 import './CreateAccountPage.css'
 
-function CreateAccountPage({ saveFeedback = null }) {
+function CreateAccountPage() {
+  const [busy, setBusy] = useState(false)
+  const [credentials, setCredentials] = useState(null)
   const [feedback, setFeedback] = useState({
     variant: '',
     message: '',
   })
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
-
-    const formData = new FormData(event.currentTarget)
-    const passwordError = validateTemporaryPassword(
-      formData.get('temporaryPassword'),
-    )
-
+    const form = event.currentTarget
+    const values = Object.fromEntries(new FormData(form))
+    setCredentials(null)
+    const passwordError = values.temporaryPassword && validatePassword(values.temporaryPassword)
     if (passwordError) {
       setFeedback({ variant: 'error', message: passwordError })
       return
     }
 
-    setFeedback({
-      variant: 'success',
-      message: 'Details are valid. The account has not been saved.',
-    })
+    setBusy(true)
+    setFeedback({ variant: '', message: '' })
+    try {
+      const result = await postJson('/api/users', values)
+      setCredentials({ email: result.user.email, password: result.temporaryPassword })
+      setFeedback({ variant: 'success', message: result.message })
+      form.reset()
+    } catch (error) {
+      setFeedback({ variant: 'error', message: error.message })
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -39,7 +49,10 @@ function CreateAccountPage({ saveFeedback = null }) {
       <form
         className="account-form"
         onSubmit={handleSubmit}
-        onChange={() => setFeedback({ variant: '', message: '' })}
+        onChange={() => {
+          setFeedback({ variant: '', message: '' })
+          setCredentials(null)
+        }}
       >
         <div className="form-field">
           <label htmlFor="name">Full name</label>
@@ -74,25 +87,24 @@ function CreateAccountPage({ saveFeedback = null }) {
             name="temporaryPassword"
             type="password"
             autoComplete="new-password"
-            required
+            placeholder="Leave blank to generate one"
           />
         </div>
 
         <FeedbackMessage variant={feedback.variant}>
           {feedback.message}
         </FeedbackMessage>
-        {saveFeedback && (
-          <FeedbackMessage variant={saveFeedback.variant}>
-            {saveFeedback.message}
-          </FeedbackMessage>
-        )}
+        <TemporaryCredentials credentials={credentials} />
 
         <div className="account-form__actions">
-          <button className="button button--secondary" type="reset">
+          <button className="button button--secondary" type="reset" disabled={busy} onClick={() => {
+            setCredentials(null)
+            setFeedback({ variant: '', message: '' })
+          }}>
             Clear
           </button>
-          <button className="button button--primary" type="submit">
-            Validate details
+          <button className="button button--primary" type="submit" disabled={busy}>
+            {busy ? 'Saving…' : 'Create account'}
           </button>
         </div>
       </form>

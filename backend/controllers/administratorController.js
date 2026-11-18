@@ -1,245 +1,98 @@
-
 const mongoose = require("mongoose");
 const User = require("../models/User");
+const Employee = require("../models/Employee");
+const Session = require("../models/Session");
+const { findUserById, normalizeEmail } = require("../services/userService");
+const { inAccountTransaction } = require("../services/provisioningService");
+const { createAccount } = require("./userController");
+const httpError = require("../lib/httpError");
 
-const {
-  createUser,
-  findUserById
-} = require("../services/userService");
+function validId(req, res) {
+  if (mongoose.isObjectIdOrHexString(req.params.id)) return true;
+  res.status(400).json({ message: "Invalid user ID." });
+  return false;
+}
 
-// GET all users
-const getAllUsers = async (req, res) => {
-  try {
-    const users = await User.find();
+function userNotFound(res) {
+  return res.status(404).json({ message: "User not found." });
+}
 
-    return res.status(200).json({
-      message: "Users retrieved successfully.",
-      count: users.length,
-      users
-    });
-  } catch (error) {
-    console.error("Get all users error:", error.message);
+function validationError(error, res) {
+  if (!error.statusCode && error.name !== "ValidationError") throw error;
+  return res.status(error.statusCode || 400).json({ message: error.message });
+}
 
-    return res.status(500).json({
-      message: "Failed to retrieve users."
-    });
+async function getAllUsers(req, res) {
+  const users = await User.find().sort({ name: 1 });
+  return res.json({ message: "Users retrieved successfully.", count: users.length, users });
+}
+
+async function getUserById(req, res) {
+  if (!validId(req, res)) return;
+  const user = await findUserById(req.params.id);
+  if (!user) return userNotFound(res);
+  return res.json({ message: "User retrieved successfully.", user });
+}
+
+async function updateUser(req, res) {
+  if (!validId(req, res)) return;
+  const { name, email, role } = req.body ?? {};
+  const normalizedEmail = normalizeEmail(email);
+  if (typeof name !== "string" || !name.trim() || !normalizedEmail ||
+      !User.schema.path("role").enumValues.includes(role)) {
+    return res.status(400).json({ message: "A name, email and valid role are required." });
   }
-};
 
-// GET user by ID
-const getUserById = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        message: "Invalid user ID."
-      });
-    }
-
-    const user = await findUserById(id);
-
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found."
-      });
-    }
-
-    return res.status(200).json({
-      message: "User retrieved successfully.",
-      user
-    });
-  } catch (error) {
-    console.error("Get user error:", error.message);
-
-    return res.status(500).json({
-      message: "Failed to retrieve user."
-    });
-  }
-};
-
-// POST create new user
-const createNewUser = async (req, res) => {
-  try {
-    const {
-      name,
-      email,
-      role,
-      temporaryPassword
-    } = req.body;
-
-    if (!name || !email || !role || !temporaryPassword) {
-      return res.status(400).json({
-        message: "Name, email, role and temporary password are required."
-      });
-    }
-
-    const allowedRoles = [
-      "Administrator",
-      "Manager",
-      "Employee"
-    ];
-
-    if (!allowedRoles.includes(role)) {
-      return res.status(400).json({
-        message: "Invalid user role."
-      });
-    }
-
-    const user = await createUser({
-      name,
-      email,
-      password: temporaryPassword,
-      role
-    });
-
-    return res.status(201).json({
-      message: "User account created successfully.",
-      user
-    });
-  } catch (error) {
-    if (error.code === "DUPLICATE_EMAIL") {
-      return res.status(409).json({
-        message: error.message
-      });
-    }
-
-    if (error.code === "INVALID_PASSWORD") {
-      return res.status(400).json({
-        message: error.message
-      });
-    }
-
-    if (error.name === "ValidationError") {
-      return res.status(400).json({
-        message: error.message
-      });
-    }
-
-    console.error("Create user error:", error.message);
-
-    return res.status(500).json({
-      message: "Failed to create user account."
-    });
-  }
-};
-
-// PUT update user
-const updateUser = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, email, role } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        message: "Invalid user ID."
-      });
-    }
-
-    if (!name || !email || !role) {
-      return res.status(400).json({
-        message: "Name, email and role are required."
-      });
-    }
-
-    const allowedRoles = [
-      "Administrator",
-      "Manager",
-      "Employee"
-    ];
-
-    if (!allowedRoles.includes(role)) {
-      return res.status(400).json({
-        message: "Invalid user role."
-      });
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-
-    const existingUser = await User.findOne({
-      email: normalizedEmail,
-      _id: { $ne: id }
-    });
-
-    if (existingUser) {
-      return res.status(409).json({
-        message: "Email already exists."
-      });
-    }
-
-    const updatedUser = await User.findByIdAndUpdate(
-      id,
-      {
-        name,
-        email: normalizedEmail,
-        role
-      },
-      {
-        new: true,
-        runValidators: true
+    const user = await inAccountTransaction(async session => {
+      const account = await User.findById(req.params.id).session(session);
+      if (!account) return null;
+      const employee = await Employee.findOne({ user: account._id }).session(session);
+      if (employee && role !== "Employee") {
+        throw httpError(409, "A linked employee account must keep the Employee role.");
       }
-    );
 
-    if (!updatedUser) {
-      return res.status(404).json({
-        message: "User not found."
-      });
-    }
-
-    return res.status(200).json({
-      message: "User updated successfully.",
-      user: updatedUser
+      if (account.email !== normalizedEmail) {
+        const filter = { email: normalizedEmail };
+        if (employee) filter._id = { $ne: employee._id };
+        if (await Employee.exists(filter).session(session)) {
+          throw httpError(409, "That email belongs to another employee record.");
+        }
+      }
+      if (account.email !== normalizedEmail || account.role !== role) {
+        account.sessionVersion = (account.sessionVersion ?? 0) + 1;
+      }
+      account.set({ name, email: normalizedEmail, role });
+      await account.save({ session });
+      if (employee && employee.email !== normalizedEmail) {
+        employee.email = normalizedEmail;
+        await employee.save({ session });
+      }
+      return account;
     });
+    if (!user) return userNotFound(res);
+    return res.json({ message: "User updated successfully.", user });
   } catch (error) {
-    console.error("Update user error:", error.message);
-
-    if (error.code === 11000) {
-      return res.status(409).json({
-        message: "Email already exists."
-      });
-    }
-
-    return res.status(400).json({
-      message: "Failed to update user."
-    });
+    return validationError(error, res);
   }
-};
+}
 
-// DELETE user
-const deleteUser = async (req, res) => {
+async function deleteUser(req, res) {
+  if (!validId(req, res)) return;
   try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        message: "Invalid user ID."
-      });
-    }
-
-    const deletedUser = await User.findByIdAndDelete(id);
-
-    if (!deletedUser) {
-      return res.status(404).json({
-        message: "User not found."
-      });
-    }
-
-    return res.status(200).json({
-      message: "User account deleted successfully."
+    const deleted = await inAccountTransaction(async session => {
+      const id = req.params.id;
+      const account = await User.findByIdAndDelete(id, { session });
+      if (!account) return false;
+      await Employee.updateOne({ user: id }, { $unset: { user: 1 } }, { session });
+      await Session.deleteMany({ user: id }, { session });
+      return true;
     });
+    if (!deleted) return userNotFound(res);
+    return res.json({ message: "User account deleted successfully." });
   } catch (error) {
-    console.error("Delete user error:", error.message);
-
-    return res.status(500).json({
-      message: "Failed to delete user."
-    });
+    return validationError(error, res);
   }
-};
+}
 
-module.exports = {
-  getAllUsers,
-  getUserById,
-  createNewUser,
-  updateUser,
-  deleteUser
-};
+module.exports = { getAllUsers, getUserById, createNewUser: createAccount, updateUser, deleteUser };
