@@ -15,6 +15,7 @@ const navigationByRole = {
   ],
   [ROLES.EMPLOYEE]: [
     { label: 'Home', to: ROUTES.EMPLOYEE_HOME },
+    { label: 'My profile', to: ROUTES.EMPLOYEE_PROFILE },
     { label: 'Availability', to: ROUTES.EMPLOYEE_AVAILABILITY },
   ],
 }

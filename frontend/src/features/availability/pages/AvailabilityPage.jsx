@@ -1,200 +1,215 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import AvailabilityCalendar from '../components/AvailabilityCalendar.jsx'
+import AvailabilityWeek from '../components/AvailabilityWeek.jsx'
+import { DAYS, blankWeek, blankWindow, buildDays, displayDate, earliestStart, validStart } from '../availabilityRules.js'
+import { getCurrentAvailability, getMyAvailabilityRequests, submitAvailabilityRequest } from '../services/availabilityRequestService.js'
 import './AvailabilityPage.css'
 
-const weekdayFormatter = new Intl.DateTimeFormat('en-US', {
-  weekday: 'short',
-})
-
-const fullDateFormatter = new Intl.DateTimeFormat('en-US', {
-  weekday: 'long',
-  month: 'long',
-  day: 'numeric',
-  year: 'numeric',
-})
-
-const monthDayFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-})
-
-function getDateKey(date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
+function TimeSelect({ label, value, onChange, disabled, id }) {
+  return <fieldset className="av-time-select" disabled={disabled}>
+    <legend>{label}</legend>
+    <select aria-label={`${id} hour`} value={value.hour} onChange={(event) => onChange({ ...value, hour: event.target.value })}>
+      <option value="">Hour</option>
+      {Array.from({ length: 12 }, (_, index) => <option key={index} value={String(index + 1)}>{index + 1}</option>)}
+    </select>
+    <span>:</span>
+    <select aria-label={`${id} minute`} value={value.minute} onChange={(event) => onChange({ ...value, minute: event.target.value })}>
+      <option value="">Min</option>
+      {Array.from({ length: 60 }, (_, index) => <option key={index} value={String(index).padStart(2, '0')}>{String(index).padStart(2, '0')}</option>)}
+    </select>
+    <select aria-label={`${id} AM or PM`} value={value.period} onChange={(event) => onChange({ ...value, period: event.target.value })}>
+      <option>AM</option><option>PM</option>
+    </select>
+  </fieldset>
 }
 
-function getWeekDates(weekOffset) {
-  const today = new Date()
-  const monday = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  )
-  const daysSinceMonday = (monday.getDay() + 6) % 7
-
-  monday.setDate(monday.getDate() - daysSinceMonday + weekOffset * 7)
-
-  return Array.from({ length: 7 }, (_, index) => {
-    return new Date(
-      monday.getFullYear(),
-      monday.getMonth(),
-      monday.getDate() + index,
-    )
-  })
+function TrashIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" /></svg>
 }
 
-function AvailabilityPage() {
-  const [weekOffset, setWeekOffset] = useState(0)
-  const [selectedDates, setSelectedDates] = useState([])
-  const weekDates = getWeekDates(weekOffset)
-  const [hoursByDate, setHoursByDate] = useState({})
+export default function AvailabilityPage() {
+  const [current, setCurrent] = useState(null)
+  const [requests, setRequests] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [reload, setReload] = useState(0)
+  const [mode, setMode] = useState('current')
+  const [periodStart, setPeriodStart] = useState('')
+  const [week, setWeek] = useState(blankWeek)
+  const [activeDay, setActiveDay] = useState(0)
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const [copyOpen, setCopyOpen] = useState(false)
+  const [targets, setTargets] = useState([])
+  const [copyMessage, setCopyMessage] = useState('')
+  const [error, setError] = useState('')
+  const [summary, setSummary] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [uncertain, setUncertain] = useState(false)
+  const [requestKey, setRequestKey] = useState('')
+  const submittingRef = useRef(false)
+  const headingRef = useRef(null)
 
-  function toggleDate(date) {
-    const dateKey = getDateKey(date)
+  useEffect(() => {
+    const controller = new AbortController()
+    async function load() {
+      setLoading(true); setLoadError('')
+      try {
+        const [effective, history] = await Promise.all([
+          getCurrentAvailability({ signal: controller.signal }),
+          getMyAvailabilityRequests({ signal: controller.signal }),
+        ])
+        if (!controller.signal.aborted) { setCurrent(effective); setRequests(history) }
+      } catch (failure) {
+        if (failure.name !== 'AbortError') setLoadError(failure.message)
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
+    }
+    load()
+    return () => controller.abort()
+  }, [reload])
 
-    setSelectedDates((currentDates) =>
-      currentDates.includes(dateKey)
-        ? currentDates.filter((selectedDate) => selectedDate !== dateKey)
-        : [...currentDates, dateKey].sort(),
-    )
-    
+  function openMode(next) {
+    setMode(next)
+    requestAnimationFrame(() => headingRef.current?.focus())
   }
 
-  function updateHours(dateKey, field, value) {
-    setHoursByDate((currentHours) => ({
-      ...currentHours,
-      [dateKey]: {
-        ...currentHours[dateKey],
-        [field]: value,
-      },
-    }))
+  function startRequest() {
+    setPeriodStart(''); setWeek(blankWeek()); setActiveDay(0)
+    setError(''); setSummary(null); setSubmitted(false); setUncertain(false)
+    setCalendarOpen(false); setCopyOpen(false); setTargets([]); setCopyMessage('')
+    setRequestKey(crypto.randomUUID())
+    openMode('edit')
   }
 
-  function changeWeek(direction) {
-    setWeekOffset((currentOffset) => currentOffset + direction)
-    setSelectedDates([])
+  function updateWindows(day, windows) {
+    setWeek((previous) => previous.map((entry, index) => index === day ? windows : entry))
+    setError(''); setCopyMessage('')
   }
 
-  return (
-    <section
-      className="availability-page"
-      aria-labelledby="availability-page-title"
-    >
-      <header className="availability-page__header">
-        <p className="availability-page__eyebrow">Availability</p>
-        <h1 id="availability-page-title">Set your weekly availability</h1>
-        <p>Select the dates when you are available to work.</p>
-      </header>
+  function chooseDay(day) {
+    setActiveDay(day); setCopyOpen(false); setTargets([]); setCopyMessage('')
+  }
 
-      <section className="availability-calendar" aria-label="Weekly calendar">
-        <div className="availability-calendar__navigation">
-          <button type="button" onClick={() => changeWeek(-1)}>
-            Previous week
-          </button>
+  function copyToDays() {
+    try {
+      buildDays(week.map((windows, index) => index === activeDay ? windows : []))
+      if (!week[activeDay].length) throw new Error('Add an availability window before copying.')
+      if (!targets.length) throw new Error('Select at least one destination day.')
+      const occupied = targets.filter((day) => week[day].length > 0)
+      if (occupied.length) throw new Error(`${occupied.map((day) => DAYS[day]).join(', ')} already has availability. Delete its windows first.`)
+      setWeek((previous) => previous.map((windows, index) => targets.includes(index) ? structuredClone(previous[activeDay]) : windows))
+      setCopyMessage(`Copied to ${targets.map((day) => DAYS[day]).join(', ')}.`)
+      setTargets([]); setCopyOpen(false)
+    } catch (failure) { setCopyMessage(failure.message) }
+  }
 
-          <h2>
-            {monthDayFormatter.format(weekDates[0])}
-            {' - '}
-            {monthDayFormatter.format(weekDates[6])}
-          </h2>
+  function reviewRequest() {
+    try {
+      if (!validStart(periodStart)) throw new Error('Please select a start date at least 8 days from now.')
+      const days = buildDays(week)
+      setSummary({ periodStart, days, clientRequestId: requestKey })
+      setError(''); setCalendarOpen(false); openMode('review')
+    } catch (failure) { setError(failure.message) }
+  }
 
-          <button type="button" onClick={() => changeWeek(1)}>
-            Next week
-          </button>
-        </div>
+  async function confirmRequest() {
+    if (submittingRef.current) return
+    // An uncertain retry uses exactly the same payload/key, even if the deadline passed.
+    if (!uncertain && !validStart(summary.periodStart)) {
+      setError('This start date is now too soon. Go back and select a date at least 8 days from now.')
+      return
+    }
+    submittingRef.current = true; setSubmitting(true); setError('')
+    try {
+      await submitAvailabilityRequest(summary)
+      setSubmitted(true); setUncertain(false); openMode('current')
+      setReload((value) => value + 1)
+    } catch (failure) {
+      setUncertain(true)
+      setError(`${failure.message} You can retry this same request or check My requests. Do not create a duplicate request.`)
+    } finally { submittingRef.current = false; setSubmitting(false) }
+  }
 
-        <div className="availability-calendar__days">
-          {weekDates.map((date) => {
-            const dateKey = getDateKey(date)
-            const isSelected = selectedDates.includes(dateKey)
+  return <section className="av-page">
+    <header className="av-page-header">
+      <div><p className="av-eyebrow">Employee workspace</p><h1 ref={headingRef} tabIndex={-1}>{mode === 'current' ? 'Availability' : mode === 'edit' ? 'New availability' : 'Days and times selected'}</h1></div>
+      {mode === 'current' && <button className="av-button av-primary" type="button" onClick={startRequest}>New availability</button>}
+    </header>
 
-            return (
-              <button
-                key={dateKey}
-                className={`availability-calendar__day${isSelected ? ' is-selected' : ''}`}
-                type="button"
-                aria-pressed={isSelected}
-                aria-label={`${fullDateFormatter.format(date)}${
-                  isSelected ? ', selected' : ''
-                }`}
-                onClick={() => toggleDate(date)}
-              >
-                <span>{weekdayFormatter.format(date)}</span>
-                <strong>{date.getDate()}</strong>
-              </button>
-            )
-          })}
-        </div>
-
-        <p className="availability-calendar__selection" role="status">
-          {selectedDates.length === 0
-            ? 'Select one or more available dates.'
-            : `${selectedDates.length} ${
-                selectedDates.length === 1 ? 'day' : 'days'
-              } selected.`}
-        </p>
-        {selectedDates.length > 0 && (
-          <section
-            className="availability-details"
-            aria-labelledby="availability-details-title"
-          >
-            <header>
-              <h2 id="availability-details-title">Available hours</h2>
-              <p>Set a separate time range for each selected date.</p>
-            </header>
-
-            <div className="availability-details__list">
-              {selectedDates.map((dateKey) => {
-                const date = new Date(`${dateKey}T00:00:00`)
-                const hours = hoursByDate[dateKey] ?? {
-                  startTime: '',
-                  endTime: '',
-                }
-
-                return (
-                  <article className="availability-date-card" key={dateKey}>
-                    <h3>{fullDateFormatter.format(date)}</h3>
-
-                    <div className="availability-date-card__times">
-                      <div className="form-field">
-                        <label htmlFor={`${dateKey}-start`}>Start time</label>
-                        <input
-                          id={`${dateKey}-start`}
-                          name={`${dateKey}.startTime`}
-                          type="time"
-                          value={hours.startTime}
-                          onChange={(event) =>
-                            updateHours(dateKey, 'startTime', event.target.value)
-                          }
-                          required
-                        />
-                      </div>
-
-                      <div className="form-field">
-                        <label htmlFor={`${dateKey}-end`}>End time</label>
-                        <input
-                          id={`${dateKey}-end`}
-                          name={`${dateKey}.endTime`}
-                          type="time"
-                          value={hours.endTime}
-                          onChange={(event) =>
-                            updateHours(dateKey, 'endTime', event.target.value)
-                          }
-                          required
-                        />
-                      </div>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          </section>
-        )}
+    {mode === 'current' && <>
+      {submitted && <p className="av-success" role="status">✓ Request submitted. Pending manager approval.</p>}
+      <section className="av-card">
+        <h2 className="av-centered">Current availability</h2>
+        <div className="av-refresh"><button className="av-text-button" disabled={loading} onClick={() => setReload((value) => value + 1)}>Refresh availability</button></div>
+        {loading ? <p role="status">Loading availability…</p> : loadError ? <p className="av-error" role="alert">{loadError}</p> : current ? <>
+          <p className="av-centered">Effective from {displayDate(current.effectiveFrom || current.periodStart)}</p>
+          <AvailabilityWeek days={current.days} />
+        </> : <p className="av-centered">No approved availability is currently in effect.</p>}
       </section>
-    </section>
-  )
-}
+      {!loading && !loadError && <section className="av-card">
+        <h2>My requests</h2>
+        {requests.length === 0 ? <p>No availability requests submitted.</p> : requests.map((request) => <details className="av-request" key={request._id}>
+          <summary>Period starting {displayDate(request.periodStart)} · {request.status === 'pending' ? 'Pending approval' : 'Approved'}</summary>
+          <AvailabilityWeek days={request.days} />
+        </details>)}
+      </section>}
+    </>}
 
-export default AvailabilityPage
+    {mode === 'edit' && <section className="av-card">
+      <div className="av-period">
+        <label id="period-label">Period starting</label>
+        <button type="button" className="av-date-button" aria-labelledby="period-label period-value" aria-expanded={calendarOpen} onClick={() => setCalendarOpen((value) => !value)}>
+          <span id="period-value">{periodStart ? displayDate(periodStart) : 'Select a start date'}</span><span aria-hidden="true">▦</span>
+        </button>
+        {calendarOpen && <AvailabilityCalendar initialDate={periodStart || earliestStart()} onSelect={(key) => { setPeriodStart(key); setCalendarOpen(false); setError('') }} onClose={() => setCalendarOpen(false)} />}
+      </div>
+      <p>Please select a start date at least 8 days from now.</p>
+      <div className="av-days-row" aria-label="Choose a day to edit">
+        {DAYS.map((day, index) => <button type="button" key={day} className={`${week[index].length ? 'av-selected-day' : ''} ${activeDay === index ? 'av-active-day' : ''}`} aria-pressed={activeDay === index} onClick={() => chooseDay(index)}>{day}</button>)}
+      </div>
+      <div className="av-copy">
+        <button className="av-text-button" type="button" aria-expanded={copyOpen} onClick={() => { setCopyOpen((value) => !value); setCopyMessage(''); setTargets([]) }}>Copy to</button>
+        {copyOpen && <div className="av-copy-panel">
+          <p>Copy all {DAYS[activeDay]} windows to:</p>
+          {DAYS.map((day, index) => index === activeDay ? null : <label key={day}>
+            <input type="checkbox" checked={targets.includes(index)} onChange={(event) => {
+              if (week[index].length) { setCopyMessage(`${day} already has availability. Delete its windows using the trash icon first.`); return }
+              setTargets((previous) => event.target.checked ? [...previous, index] : previous.filter((value) => value !== index))
+            }} />{day}{week[index].length > 0 && <span className="av-muted"> — already has availability</span>}
+          </label>)}
+          <button className="av-button" type="button" onClick={copyToDays}>Copy selected days</button>
+        </div>}
+        {copyMessage && <p role="status">{copyMessage}</p>}
+      </div>
+      <section className="av-editor" aria-label={`${DAYS[activeDay]} availability`}>
+        <h2>{DAYS[activeDay]}</h2>
+        {!week[activeDay].length && <p>No availability selected for this day.</p>}
+        {week[activeDay].map((window, index) => <div className="av-window" key={`${activeDay}-${index}`}>
+          {['from', 'to'].map((field) => <TimeSelect key={field} label={field === 'from' ? 'From' : 'To'} id={`${DAYS[activeDay]} window ${index + 1} ${field}`} value={window[field]} onChange={(time) => updateWindows(activeDay, week[activeDay].map((entry, position) => position === index ? { ...entry, [field]: time } : entry))} />)}
+          <button className="av-trash" type="button" aria-label={`Delete ${DAYS[activeDay]} window ${index + 1}`} onClick={() => updateWindows(activeDay, week[activeDay].filter((_, position) => position !== index))}><TrashIcon /></button>
+        </div>)}
+        <button className="av-text-button" type="button" onClick={() => updateWindows(activeDay, [...week[activeDay], blankWindow()])}>+ Add availability window</button>
+        <p className="av-muted">To 12:00 AM means midnight at the end of this day.</p>
+      </section>
+      {error && <p className="av-error" role="alert">{error}</p>}
+      <footer className="av-actions">
+        <button className="av-button" type="button" onClick={() => openMode('current')}>Cancel</button>
+        <button className="av-button av-primary" type="button" onClick={reviewRequest}>Submit new availability request</button>
+      </footer>
+    </section>}
+
+    {mode === 'review' && summary && <section className="av-card">
+      <p><strong>Period starting:</strong> {displayDate(summary.periodStart)}, 12:00 AM Toronto time.</p>
+      <AvailabilityWeek days={summary.days} />
+      {summary.days.every((day) => !day.windows.length) && <p className="av-notice">This request declares no availability on any day of the week.</p>}
+      <p>Your current availability stays in effect until this request is approved and its starting date has arrived.</p>
+      {error && <p className="av-error" role="alert">{error}</p>}
+      <footer className="av-actions">
+        {uncertain ? <button className="av-button" disabled={submitting} onClick={() => { openMode('current'); setReload((value) => value + 1) }}>Check my requests</button> : <button className="av-button" disabled={submitting} onClick={() => openMode('edit')}>Back to edit</button>}
+        <button className="av-button av-primary" disabled={submitting} onClick={confirmRequest}>{submitting ? 'Submitting…' : uncertain ? 'Retry same request' : 'Confirm'}</button>
+      </footer>
+    </section>}
+  </section>
+}

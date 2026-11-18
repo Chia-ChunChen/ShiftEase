@@ -8,6 +8,7 @@ import { ROLES } from './roles.js'
 import AdminHomePage from '../features/home/pages/AdminHomePage.jsx'
 import ManagerHomePage from '../features/home/pages/ManagerHomePage.jsx'
 import EmployeeHomePage from '../features/home/pages/EmployeeHomePage.jsx'
+import EmployeeProfilePage from '../features/employees/pages/EmployeeProfilePage.jsx'
 import AccountsPage from '../features/accounts/pages/AccountsPage.jsx'
 import CreateAccountPage from '../features/accounts/pages/CreateAccountPage.jsx'
 import NewEmployeePage from '../features/employees/pages/NewEmployeePage.jsx'
@@ -17,6 +18,14 @@ import AvailabilityPage from '../features/availability/pages/AvailabilityPage.js
 function App() {
   return (
     <Routes>
+      <Route
+        path={ROUTES.EMPLOYEE_PROFILE}
+        element={
+          <DashboardLayout role={ROLES.EMPLOYEE}>
+            <EmployeeProfilePage />
+          </DashboardLayout>
+          }
+      />
       <Route
         path="/"
         element={<Navigate to={ROUTES.LOGIN} replace />}

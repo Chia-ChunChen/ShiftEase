@@ -8,6 +8,7 @@ export const ROUTES = Object.freeze({
   NEW_EMPLOYEE: '/manager/employees/new',
   NEW_SCHEDULE: '/manager/schedules/new',
   EMPLOYEE_HOME: '/employee',
+  EMPLOYEE_PROFILE: '/employee/profile',
   EMPLOYEE_AVAILABILITY: '/employee/availability',
   ADMIN_ACCOUNTS: '/admin/accounts',
   ADMIN_CREATE_ACCOUNT: '/admin/accounts/new',
@@ -25,6 +26,7 @@ export const ROUTE_ACCESS = Object.freeze({
   [ROUTES.NEW_EMPLOYEE]: [ROLES.MANAGER],
   [ROUTES.NEW_SCHEDULE]: [ROLES.MANAGER],
   [ROUTES.EMPLOYEE_HOME]: [ROLES.EMPLOYEE],
+  [ROUTES.EMPLOYEE_PROFILE]: [ROLES.EMPLOYEE],
   [ROUTES.EMPLOYEE_AVAILABILITY]: [ROLES.EMPLOYEE],
 });
 
