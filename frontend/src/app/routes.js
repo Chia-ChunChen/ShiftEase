@@ -3,6 +3,7 @@ import { ROLES } from './roles.js';
 // Application routes and role access map.
 export const ROUTES = Object.freeze({
   LOGIN: '/login',
+  PROFILE: '/profile',
   ADMIN_HOME: '/admin',
   MANAGER_HOME: '/manager',
   NEW_EMPLOYEE: '/manager/employees/new',
@@ -22,6 +23,7 @@ export const PUBLIC_ROUTES = Object.freeze([
 ]);
 
 export const ROUTE_ACCESS = Object.freeze({
+  [ROUTES.PROFILE]: Object.values(ROLES),
   [ROUTES.ADMIN_HOME]: [ROLES.ADMINISTRATOR],
   [ROUTES.ADMIN_ACCOUNTS]: [ROLES.ADMINISTRATOR],
   [ROUTES.ADMIN_CREATE_ACCOUNT]: [ROLES.ADMINISTRATOR],

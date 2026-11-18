@@ -2,14 +2,16 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { ROUTES } from '../../../app/routes.js'
 import FeedbackMessage from '../../../shared/components/FeedbackMessage.jsx'
-import { validateTemporaryPassword } from '../accountValidation.js'
+import { validatePassword } from '../accountValidation.js'
+import { postJson } from '../../../shared/services/apiClient.js'
+import TemporaryCredentials from '../components/TemporaryCredentials.jsx'
 import './CreateAccountPage.css'
 
 function CreateAccountPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [feedback, setFeedback] = useState(null)
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
     const form = event.currentTarget
@@ -146,8 +148,8 @@ function CreateAccountPage() {
           <button className="button button--secondary" type="reset">
             Clear
           </button>
-          <button className="button button--primary" type="submit">
-            Validate details
+          <button className="button button--primary" type="submit" disabled={busy}>
+            {busy ? 'Saving…' : 'Create account'}
           </button>
         </div>
       </form>

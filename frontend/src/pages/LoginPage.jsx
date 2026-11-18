@@ -1,8 +1,25 @@
+import { useState } from 'react'
+import FeedbackMessage from '../shared/components/FeedbackMessage.jsx'
+import { postJson } from '../shared/services/apiClient.js'
 import './LoginPage.css'
 
-function LoginPage() {
-  function handleSubmit(event) {
+function LoginPage({ onSignIn }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(event) {
     event.preventDefault()
+    const { email, password } = Object.fromEntries(new FormData(event.currentTarget))
+    setBusy(true)
+    setError('')
+    try {
+      const result = await postJson('/api/users/login', { email, password })
+      onSignIn(result.user)
+    } catch (error) {
+      setError(error.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -35,8 +52,9 @@ function LoginPage() {
             />
           </div>
 
-          <button className="button button--primary" type="submit">
-            Sign in
+          <FeedbackMessage variant="error">{error}</FeedbackMessage>
+          <button className="button button--primary" type="submit" disabled={busy}>
+            {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 

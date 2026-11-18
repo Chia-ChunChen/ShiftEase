@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import FeedbackMessage from '../shared/components/FeedbackMessage.jsx'
+import { requestJson } from '../shared/services/apiClient.js'
 import { NavLink } from 'react-router'
 import { ROLES } from '../app/roles.js'
 import { ROUTES } from '../app/routes.js'
@@ -23,8 +26,24 @@ const navigationByRole = {
   ],
 }
 
-function DashboardLayout({ children, role }) {
-  const navigationItems = navigationByRole[role] ?? []
+function DashboardLayout({ children, role, mustChangePassword, onSignOut }) {
+  const [signingOut, setSigningOut] = useState(false)
+  const [error, setError] = useState('')
+  const profile = { label: 'My profile', to: ROUTES.PROFILE }
+  const navigationItems = mustChangePassword ? [profile] : [...(navigationByRole[role] ?? []), profile]
+
+  async function signOut() {
+    setSigningOut(true)
+    setError('')
+    try {
+      await requestJson('/api/users/logout', { method: 'POST' })
+      onSignOut()
+    } catch (error) {
+      setError(error.message)
+    } finally {
+      setSigningOut(false)
+    }
+  }
 
   return (
     <div className="dashboard-layout" data-role={role}>
@@ -51,8 +70,12 @@ function DashboardLayout({ children, role }) {
       <div className="dashboard-content">
         <header className="dashboard-topbar">
           <span>{role} workspace</span>
+          <button className="button button--secondary" type="button" onClick={signOut} disabled={signingOut}>Sign out</button>
         </header>
-        <main className="dashboard-main">{children}</main>
+        <main className="dashboard-main">
+          <FeedbackMessage variant="error">{error}</FeedbackMessage>
+          {children}
+        </main>
       </div>
     </div>
   )

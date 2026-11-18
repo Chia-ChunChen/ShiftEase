@@ -78,6 +78,8 @@ async function requestJson(path, { method = 'GET', body, signal } = {}) {
       response.status,
     )
   }
+  return data
+}
 
   return data
 }

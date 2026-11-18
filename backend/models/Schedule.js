@@ -18,15 +18,29 @@ const scheduleSchema = new mongoose.Schema(
       required: true
     },
 
-    employees: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Employee"
-      }
-    ]
+
+  employees: [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Employee"
+  }
+],
+
+  status: {
+  type: String,
+  enum: ["draft", "published"],
+  default: "draft"
+},
+
+  publishedAt: {
+  type: Date,
+  default: null
+}
+
   },
   {
-    timestamps: true
+    timestamps: true,
+    optimisticConcurrency: true
   }
 );
 
