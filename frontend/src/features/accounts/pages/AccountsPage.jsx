@@ -1,38 +1,58 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { ROUTES } from '../../../app/routes.js'
-import FeedbackMessage from '../../../shared/components/FeedbackMessage.jsx'
-import { requestJson } from '../../../shared/services/apiClient.js'
-import './CreateAccountPage.css'
+import './AccountsPage.css'
 
 function AccountsPage() {
-  const [users, setUsers] = useState(null)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    const abort = new AbortController()
-    requestJson('/api/users', { signal: abort.signal })
-      .then(result => setUsers(result.users))
-      .catch(error => {
-        if (error.name !== 'AbortError') setError(error.message)
-      })
-    return () => abort.abort()
-  }, [])
-
   return (
-    <section className="account-page">
-      <header className="page-header">
-        <h1>User accounts</h1>
-        <Link className="button button--primary" to={ROUTES.ADMIN_CREATE_ACCOUNT}>Create account</Link>
+    <section className="accounts-page" aria-labelledby="accounts-page-title">
+      <header className="accounts-page__header">
+        <div className="accounts-page__intro">
+          <p className="accounts-page__eyebrow">User management</p>
+          <h1 id="accounts-page-title">User accounts</h1>
+          <p>View user accounts and create accounts for new users.</p>
+        </div>
+
+        <Link
+          className="accounts-page__create"
+          to={ROUTES.ADMIN_CREATE_ACCOUNT}
+        >
+          Create account
+        </Link>
       </header>
-      <FeedbackMessage variant="error">{error}</FeedbackMessage>
-      {!users && !error && <p>Loading accounts…</p>}
-      {users?.length === 0 && <p>No accounts found.</p>}
-      {users?.length > 0 && (
-        <ul>
-          {users.map(user => <li key={user._id}>{user.name} · {user.email} · {user.role}</li>)}
-        </ul>
-      )}
+
+      <section
+        className="accounts-panel"
+        aria-labelledby="accounts-list-title"
+      >
+        <h2 id="accounts-list-title">Existing accounts</h2>
+
+        <div
+          className="accounts-panel__table-wrapper"
+          role="region"
+          aria-labelledby="accounts-list-title"
+          tabIndex={0}
+        >
+          <table className="accounts-table">
+            <caption className="accounts-table__caption">
+              User account names, email addresses and roles
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Full name</th>
+                <th scope="col">Email address</th>
+                <th scope="col">Role</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="accounts-table__message" colSpan={3}>
+                  The account list is not available yet.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </section>
   )
 }

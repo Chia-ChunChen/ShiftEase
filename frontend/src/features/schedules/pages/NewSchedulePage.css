@@ -30,6 +30,7 @@
 
 .schedule-calendar,
 .schedule-preview {
+  min-width: 0;
   padding: 28px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
@@ -39,12 +40,15 @@
 
 .schedule-calendar {
   display: grid;
+  align-content: start;
   gap: 24px;
 }
 
+/* Weekly navigation */
+
 .schedule-calendar__navigation {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
 }
@@ -56,14 +60,20 @@
 }
 
 .schedule-calendar__navigation button {
-  min-height: 40px;
-  padding: 0 12px;
+  min-height: 44px;
+  padding: 8px 12px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   color: var(--color-text);
   background: var(--color-surface);
   cursor: pointer;
 }
+
+.schedule-calendar__navigation button:hover {
+  background: var(--color-background);
+}
+
+/* Weekly date selection */
 
 .schedule-calendar__days {
   display: grid;
@@ -72,11 +82,13 @@
 }
 
 .schedule-calendar__day {
-  min-height: 88px;
   display: grid;
   align-content: center;
   justify-items: center;
   gap: 8px;
+  min-width: 0;
+  min-height: 88px;
+  padding: 8px 0;
   border: 1px solid var(--color-border);
   border-radius: 10px;
   color: var(--color-text);
@@ -93,6 +105,10 @@
   font-size: 22px;
 }
 
+.schedule-calendar__day:hover {
+  border-color: var(--color-primary);
+}
+
 .schedule-calendar__day.is-selected {
   border-color: var(--color-primary);
   color: #fff;
@@ -103,21 +119,18 @@
   color: rgba(255, 255, 255, 0.82);
 }
 
-.schedule-calendar__day:focus-visible,
-.schedule-calendar__navigation button:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
 .schedule-calendar__selection {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 14px;
 }
 
+/* Shift hours */
+
 .schedule-date-card {
   display: grid;
   gap: 16px;
+  min-width: 0;
   padding: 20px;
   border: 1px solid var(--color-border);
   border-radius: 12px;
@@ -138,6 +151,7 @@
 .schedule-date-card .form-field {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .schedule-date-card label {
@@ -147,6 +161,7 @@
 
 .schedule-date-card input {
   width: 100%;
+  min-width: 0;
   min-height: 44px;
   padding: 10px 12px;
   border: 1px solid var(--color-border);
@@ -155,15 +170,38 @@
   background: var(--color-surface);
 }
 
-.schedule-date-card input:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+/* Calendar icon on the left and save button on the right */
+
+.schedule-calendar__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
 }
 
-.schedule-calendar > .button--primary {
+.schedule-calendar .schedule-calendar__open-picker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: var(--color-primary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.schedule-calendar .schedule-calendar__open-picker:hover {
+  background: var(--color-background);
+}
+
+.schedule-calendar__footer .button--primary {
   min-height: 44px;
-  justify-self: end;
-  padding: 0 16px;
+  padding: 10px 16px;
   border: 0;
   border-radius: 8px;
   color: #fff;
@@ -171,6 +209,23 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+.schedule-calendar__footer .button--primary:hover {
+  background: var(--color-primary-hover);
+}
+
+/* Keyboard focus */
+
+.schedule-calendar__day:focus-visible,
+.schedule-calendar__navigation button:focus-visible,
+.schedule-calendar__open-picker:focus-visible,
+.schedule-calendar__footer .button--primary:focus-visible,
+.schedule-date-card input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+/* Employee assignment panel */
 
 .schedule-preview h2 {
   margin: 0;
@@ -182,6 +237,8 @@
   color: var(--color-text-muted);
 }
 
+/* Smaller screens */
+
 @media (max-width: 900px) {
   .schedule-page__layout {
     grid-template-columns: 1fr;
@@ -190,18 +247,23 @@
 
 @media (max-width: 760px) {
   .schedule-calendar__days {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .schedule-calendar__day {
+    min-height: 72px;
   }
 }
 
 @media (max-width: 560px) {
   .schedule-calendar,
   .schedule-preview {
-    padding: 20px;
+    padding: 16px;
   }
 
   .schedule-calendar__navigation {
     grid-template-columns: 1fr 1fr;
+    gap: 12px;
   }
 
   .schedule-calendar__navigation h2 {
@@ -210,15 +272,151 @@
   }
 
   .schedule-calendar__days {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .schedule-calendar__day span {
+    font-size: 11px;
+  }
+
+  .schedule-calendar__day strong {
+    font-size: 18px;
+  }
+
+  .schedule-date-card {
+    padding: 16px;
   }
 
   .schedule-date-card__times {
     grid-template-columns: 1fr;
   }
 
-  .schedule-calendar > .button--primary {
-    width: 100%;
-    justify-self: stretch;
+  .schedule-calendar__footer {
+    gap: 8px;
   }
-}   
+
+  .schedule-calendar__footer .button--primary {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+}
+
+.schedule-preview {
+  display: grid;
+  align-content: start;
+  gap: 20px;
+}
+
+.schedule-preview > p {
+  margin: 0;
+}
+
+.assignment-field {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.assignment-field label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.assignment-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+}
+
+.assignment-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.assignment-section h3,
+.assignment-section p {
+  margin: 0;
+}
+
+.assignment-section h3 {
+  font-size: 16px;
+}
+
+.assignment-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assignment-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.assignment-list li > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.assignment-list span {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.schedule-action {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.schedule-action:hover {
+  background: var(--color-background);
+}
+
+.schedule-action--primary {
+  border-color: var(--color-primary);
+  color: #fff;
+  background: var(--color-primary);
+}
+
+.schedule-action--primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.schedule-action:focus-visible,
+.assignment-field select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.schedule-page button:disabled,
+.schedule-page select:disabled,
+.schedule-page input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

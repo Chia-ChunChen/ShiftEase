@@ -1,0 +1,95 @@
+.date-picker {
+  display: grid;
+  align-content: start;
+  gap: 20px;
+  width: 100%;
+  min-width: 0;
+}
+
+.date-picker__navigation {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-picker button {
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  cursor: pointer;
+}
+
+.date-picker button:hover {
+  color: var(--color-primary);
+  background: var(--color-background);
+}
+
+.date-picker button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.date-picker__navigation h2 {
+  margin: 0;
+  font-size: 18px;
+  text-align: center;
+}
+
+.date-picker .date-picker__heading {
+  border-color: transparent;
+  color: var(--color-primary);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.date-picker__instruction {
+  margin: 0;
+  font-size: 14px;
+  text-align: center;
+}
+
+.date-picker__days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.date-picker__weekday {
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.date-picker__days button {
+  padding: 8px 0;
+}
+
+.date-picker__days .is-today {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.date-picker__options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.date-picker__options button {
+  min-height: 64px;
+  overflow-wrap: anywhere;
+}
+
+.date-picker__footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}

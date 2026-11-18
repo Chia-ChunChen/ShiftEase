@@ -106,3 +106,67 @@
     width: 100%;
   }
 }
+
+.account-form .form-field {
+  align-content: start;
+}
+
+.account-form__help {
+  margin: 0;
+  font-size: 13px;
+}
+
+.account-form__password-toggle {
+  justify-self: start;
+  padding: 4px 0;
+  border: 0;
+  color: var(--color-primary);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.account-form__password-toggle:hover {
+  text-decoration: underline;
+}
+
+.account-form__notice,
+.account-form__feedback {
+  grid-column: 1 / -1;
+}
+
+.account-form__notice {
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-background);
+  font-size: 14px;
+}
+
+.account-form__notice p {
+  margin: 0;
+}
+
+.account-form__actions {
+  flex-wrap: wrap;
+}
+
+.account-form__actions .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.account-form .button:focus-visible,
+.account-form__password-toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.account-form .button--secondary:hover {
+  background: var(--color-background);
+}

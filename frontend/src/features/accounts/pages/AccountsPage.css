@@ -1,0 +1,117 @@
+.accounts-page {
+  display: grid;
+  gap: 24px;
+}
+
+.accounts-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.accounts-page__intro {
+  display: grid;
+  gap: 6px;
+}
+
+.accounts-page__intro h1,
+.accounts-page__intro p {
+  margin: 0;
+}
+
+.accounts-page__eyebrow {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.accounts-page__create {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--color-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.accounts-page__create:hover {
+  background: var(--color-primary-hover);
+}
+
+.accounts-page__create:focus-visible,
+.accounts-panel__table-wrapper:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.accounts-panel {
+  min-width: 0;
+  padding: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.accounts-panel h2 {
+  margin-bottom: 20px;
+  font-size: 20px;
+}
+
+.accounts-panel__table-wrapper {
+  overflow-x: auto;
+}
+
+.accounts-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.accounts-table__caption {
+  padding-bottom: 12px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.accounts-table th,
+.accounts-table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.accounts-table th {
+  background: var(--color-background);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.accounts-table .accounts-table__message {
+  padding: 32px 16px;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .accounts-page__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .accounts-panel {
+    padding: 20px;
+  }
+
+  .accounts-table {
+    min-width: 480px;
+  }
+}
