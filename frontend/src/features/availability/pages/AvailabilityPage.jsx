@@ -4,6 +4,8 @@ import AvailabilityWeek from '../components/AvailabilityWeek.jsx'
 import { DAYS, blankWeek, blankWindow, buildDays, displayDate, earliestStart, validStart } from '../availabilityRules.js'
 import { getCurrentAvailability, getMyAvailabilityRequests, submitAvailabilityRequest } from '../services/availabilityRequestService.js'
 import './AvailabilityPage.css'
+import { Link } from 'react-router'
+import { ROUTES } from '../../../app/routes.js'
 
 function TimeSelect({ label, value, onChange, disabled, id }) {
   return <fieldset className="av-time-select" disabled={disabled}>
@@ -132,6 +134,12 @@ export default function AvailabilityPage() {
     } finally { submittingRef.current = false; setSubmitting(false) }
   }
 
+  const latestRequest = [...requests].sort(
+    (a, b) =>
+      new Date(b.submittedAt).getTime() -
+      new Date(a.submittedAt).getTime(),
+  )[0]
+
   return <section className="av-page">
     <header className="av-page-header">
       <div><p className="av-eyebrow">Employee workspace</p><h1 ref={headingRef} tabIndex={-1}>{mode === 'current' ? 'Availability' : mode === 'edit' ? 'New availability' : 'Days and times selected'}</h1></div>
@@ -148,13 +156,25 @@ export default function AvailabilityPage() {
           <AvailabilityWeek days={current.days} />
         </> : <p className="av-centered">No approved availability is currently in effect.</p>}
       </section>
-      {!loading && !loadError && <section className="av-card">
-        <h2>My requests</h2>
-        {requests.length === 0 ? <p>No availability requests submitted.</p> : requests.map((request) => <details className="av-request" key={request._id}>
-          <summary>Period starting {displayDate(request.periodStart)} · {request.status === 'pending' ? 'Pending approval' : 'Approved'}</summary>
-          <AvailabilityWeek days={request.days} />
-        </details>)}
-      </section>}
+      {!loading && !loadError && latestRequest?.status === 'pending' && (
+        <section className="av-pending-card" aria-labelledby="latest-request-title">
+          <div>
+            <h2 id="latest-request-title">Latest availability request</h2>
+            <p>
+              Period starting {displayDate(latestRequest.periodStart)}
+            </p>
+          </div>
+
+          <span className="av-status av-status--pending">Pending</span>
+
+          <Link
+            className="av-text-button"
+            to={ROUTES.EMPLOYEE_REQUESTS}
+          >
+            Check my requests
+          </Link>
+        </section>
+      )}
     </>}
 
     {mode === 'edit' && <section className="av-card">
@@ -207,8 +227,40 @@ export default function AvailabilityPage() {
       <p>Your current availability stays in effect until this request is approved and its starting date has arrived.</p>
       {error && <p className="av-error" role="alert">{error}</p>}
       <footer className="av-actions">
-        {uncertain ? <button className="av-button" disabled={submitting} onClick={() => { openMode('current'); setReload((value) => value + 1) }}>Check my requests</button> : <button className="av-button" disabled={submitting} onClick={() => openMode('edit')}>Back to edit</button>}
-        <button className="av-button av-primary" disabled={submitting} onClick={confirmRequest}>{submitting ? 'Submitting…' : uncertain ? 'Retry same request' : 'Confirm'}</button>
+        {uncertain ? (
+          <Link
+            className="av-button"
+            to={ROUTES.EMPLOYEE_REQUESTS}
+            aria-disabled={submitting}
+            onClick={(event) => {
+              if (submitting) event.preventDefault()
+            }}
+          >
+            Check my requests
+          </Link>
+        ) : (
+          <button
+            className="av-button"
+            type="button"
+            disabled={submitting}
+            onClick={() => openMode('edit')}
+          >
+            Back to edit
+          </button>
+        )}
+
+        <button
+          className="av-button av-primary"
+          type="button"
+          disabled={submitting}
+          onClick={confirmRequest}
+        >
+          {submitting
+            ? 'Submitting…'
+            : uncertain
+              ? 'Retry same request'
+              : 'Confirm'}
+        </button>
       </footer>
     </section>}
   </section>

@@ -65,3 +65,77 @@
   .av-window { padding: 12px; gap: 12px; }
   .av-actions > button { flex: 1 1 180px; }
 }
+.av-request-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.av-request-heading h2 {
+  margin: 0;
+}
+
+.av-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.av-status--pending {
+  color: #76510a;
+  background: #fff4d6;
+  border: 1px solid #ebd69c;
+}
+
+.av-status--approved {
+  color: #205b31;
+  background: #edf7ef;
+  border: 1px solid #b6d6be;
+}
+
+.av-pending-card {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.av-pending-card > div {
+  flex: 1 1 240px;
+}
+
+.av-pending-card h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.av-pending-card p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.av-pending-card a {
+  white-space: nowrap;
+}
+
+.av-page a.av-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.av-page a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}

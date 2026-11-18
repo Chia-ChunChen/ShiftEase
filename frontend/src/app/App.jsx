@@ -14,10 +14,37 @@ import CreateAccountPage from '../features/accounts/pages/CreateAccountPage.jsx'
 import NewEmployeePage from '../features/employees/pages/NewEmployeePage.jsx'
 import NewSchedulePage from '../features/schedules/pages/NewSchedulePage.jsx'
 import AvailabilityPage from '../features/availability/pages/AvailabilityPage.jsx'
+import EmployeeRequestsPage from '../features/availability/pages/EmployeeRequestsPage.jsx'
+import AdminRequestsPage from '../features/accounts/pages/AdminRequestsPage.jsx'
+import AvailabilityRequestsPage from '../features/availability/pages/AvailabilityRequestsPage.jsx'
 
 function App() {
   return (
     <Routes>
+      <Route
+        path={ROUTES.MANAGER_AVAILABILITY_REQUESTS}
+        element={
+          <DashboardLayout role={ROLES.MANAGER}>
+            <AvailabilityRequestsPage />
+          </DashboardLayout>
+        }
+      />
+      <Route
+        path={ROUTES.EMPLOYEE_REQUESTS}
+        element={
+          <DashboardLayout role={ROLES.EMPLOYEE}>
+            <EmployeeRequestsPage />
+          </DashboardLayout>
+        }
+      />
+      <Route
+        path={ROUTES.ADMIN_REQUESTS}
+        element={
+          <DashboardLayout role={ROLES.ADMINISTRATOR}>
+            <AdminRequestsPage />
+          </DashboardLayout>
+        }
+      />
       <Route
         path={ROUTES.EMPLOYEE_PROFILE}
         element={

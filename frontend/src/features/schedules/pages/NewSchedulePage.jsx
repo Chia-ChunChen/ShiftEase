@@ -71,9 +71,12 @@ function NewSchedulePage() {
   const [loadError, setLoadError] = useState('')
   const [activeId, setActiveId] = useState('')
 
-  const [available, setAvailable] = useState([])
-  const [availableLoading, setAvailableLoading] = useState(false)
-  const [availableError, setAvailableError] = useState('')
+  const [availableResult, setAvailableResult] = useState({
+    scheduleId: '',
+    version: -1,
+    employees: [],
+    error: '',
+  })
   const [availableVersion, setAvailableVersion] = useState(0)
   const [employeeId, setEmployeeId] = useState('')
 
@@ -106,6 +109,23 @@ function NewSchedulePage() {
 
   const assignedEmployees = activeSchedule?.employees ?? []
 
+  const availableResultIsCurrent =
+    availableResult.scheduleId === activeId &&
+    availableResult.version === availableVersion
+
+  const available =
+    activeId && availableResultIsCurrent
+      ? availableResult.employees
+      : []
+
+  const availableLoading =
+    Boolean(activeId) && !availableResultIsCurrent
+
+  const availableError =
+    activeId && availableResultIsCurrent
+      ? availableResult.error
+      : ''
+
   useEffect(() => {
     const controller = new AbortController()
 
@@ -122,27 +142,32 @@ function NewSchedulePage() {
   }, [])
 
   useEffect(() => {
-    setAvailable([])
-    setEmployeeId('')
-    setAvailableError('')
-
-    if (!activeId) {
-      setAvailableLoading(false)
-      return
-    }
+    if (!activeId) return
 
     const controller = new AbortController()
-    setAvailableLoading(true)
 
-    getAvailableEmployees(activeId, { signal: controller.signal })
-      .then(setAvailable)
-      .catch((error) => {
-        if (error.name !== 'AbortError') {
-          setAvailableError(error.message)
-        }
+    getAvailableEmployees(activeId, {
+      signal: controller.signal,
+    })
+      .then((employees) => {
+        if (controller.signal.aborted) return
+
+        setAvailableResult({
+          scheduleId: activeId,
+          version: availableVersion,
+          employees,
+          error: '',
+        })
       })
-      .finally(() => {
-        if (!controller.signal.aborted) setAvailableLoading(false)
+      .catch((error) => {
+        if (controller.signal.aborted) return
+
+        setAvailableResult({
+          scheduleId: activeId,
+          version: availableVersion,
+          employees: [],
+          error: error.message,
+        })
       })
 
     return () => controller.abort()
@@ -183,6 +208,7 @@ function NewSchedulePage() {
     setSelectedDates([])
     setShiftHours({})
     setActiveId('')
+    setEmployeeId('')
     setFeedback(null)
     setAssignmentFeedback(null)
     return true
@@ -288,6 +314,7 @@ function NewSchedulePage() {
           current.filter((date) => date !== draft.shiftDate),
         )
         setActiveId(saved._id)
+        setEmployeeId('')
       }
 
       setFeedback({
@@ -527,6 +554,7 @@ function NewSchedulePage() {
                 disabled={busy || loading || Boolean(loadError)}
                 onChange={(event) => {
                   setActiveId(event.target.value)
+                  setEmployeeId('')
                   setAssignmentFeedback(null)
                 }}
               >

@@ -7,16 +7,19 @@ const navigationByRole = {
   [ROLES.ADMINISTRATOR]: [
     { label: 'Home', to: ROUTES.ADMIN_HOME },
     { label: 'User accounts', to: ROUTES.ADMIN_ACCOUNTS },
+    { label: 'Requests', to: ROUTES.ADMIN_REQUESTS },
   ],
   [ROLES.MANAGER]: [
     { label: 'Home', to: ROUTES.MANAGER_HOME },
     { label: 'Create employee', to: ROUTES.NEW_EMPLOYEE },
     { label: 'Create schedule', to: ROUTES.NEW_SCHEDULE },
+    { label: 'Requests', to: ROUTES.MANAGER_AVAILABILITY_REQUESTS },
   ],
   [ROLES.EMPLOYEE]: [
     { label: 'Home', to: ROUTES.EMPLOYEE_HOME },
     { label: 'My profile', to: ROUTES.EMPLOYEE_PROFILE },
     { label: 'Availability', to: ROUTES.EMPLOYEE_AVAILABILITY },
+    { label: 'Requests', to: ROUTES.EMPLOYEE_REQUESTS },
   ],
 }
 
