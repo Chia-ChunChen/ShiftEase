@@ -420,3 +420,53 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.schedule-page__layout { grid-template-columns: minmax(0, .9fr) minmax(0, 1.15fr); }
+.schedule-calendar h2 { margin: 0; font-size: 20px; }
+.schedule-calendar__navigation h3 { margin: 0; text-align: center; font-size: 16px; }
+.schedule-help { margin: 8px 0 0; color: var(--color-text-muted); font-size: 14px; line-height: 1.55; }
+.schedule-date-card__heading, .personal-shift__heading, .work-day-summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.schedule-inline-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.schedule-date-card__heading h2 { font-size: 20px; }
+.copy-days { min-width: 0; margin: 0; border: 1px solid var(--color-border); border-radius: 10px; padding: 16px; display: grid; gap: 16px; background: var(--color-background); }
+.copy-days legend { font-weight: 700; padding: 0 6px; }
+.copy-days__options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.copy-days__options label, .copy-days__replace { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; }
+.copy-days input[type="checkbox"] { width: 17px; height: 17px; min-height: 0; padding: 0; margin: 0; flex: 0 0 17px; accent-color: var(--color-primary); }
+.schedule-preview input[type="time"] { width: 100%; min-width: 0; min-height: 44px; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text); background: var(--color-surface); font: inherit; }
+.schedule-preview .form-field { display: grid; gap: 8px; min-width: 0; font-size: 14px; font-weight: 600; }
+.assignment-list .personal-shift { display: grid; padding: 16px; gap: 16px; }
+.personal-shift__heading > div:first-child { display: grid; gap: 5px; }
+.personal-shift__form { display: grid; gap: 14px; }
+.candidate-card { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-background); }
+.candidate-card p { margin: 5px 0 0; font-size: 14px; }
+.candidate-card .candidate-card__availability { margin: 0; color: var(--color-primary); font-weight: 600; }
+.day-status { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 999px; background: #fff5d6; color: #775800; font-size: 13px; font-weight: 700; }
+.day-status--published { background: #e9f4ec; color: #245a39; }
+.coverage-axis { display: flex; justify-content: space-between; font-size: 12px; color: var(--color-text-muted); }
+.coverage-strip { display: flex; min-height: 32px; width: 100%; overflow: hidden; border-radius: 7px; }
+.coverage-strip > div { flex-basis: 0; min-width: 0; display: grid; align-content: center; text-align: center; font-size: 12px; font-weight: 700; border-right: 1px solid white; }
+.coverage-covered { background: #d3e6da; color: #204b35; }
+.coverage-gap { background: #ffecd0; color: #764608; }
+.schedule-preview p.schedule-warning { color: #875307; font-size: 13px; }
+.schedule-preview p.schedule-covered { color: #245a39; font-size: 13px; }
+.schedule-timeline { display: grid; gap: 10px; }
+.timeline-row { display: grid; grid-template-columns: minmax(75px, .4fr) minmax(0, 1fr); gap: 12px; align-items: center; font-size: 12px; }
+.timeline-row > span { overflow-wrap: anywhere; }
+.timeline-track { position: relative; height: 32px; border-radius: 5px; background: #eef1ef; }
+.timeline-shift { position: absolute; top: 0; height: 32px; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; border-radius: 5px; background: var(--color-primary); color: white; font-size: 10px; }
+@media (max-width: 1100px) { .schedule-page__layout { grid-template-columns: 1fr; } }
+@media (max-width: 560px) {
+  .schedule-calendar__navigation h3 { grid-column: 1 / -1; grid-row: 1; }
+  .copy-days__options { grid-template-columns: 1fr; }
+  .schedule-inline-actions > button { flex-grow: 1; }
+  .work-day-summary > button { flex-grow: 1; }
+  .timeline-row { grid-template-columns: 80px minmax(0, 1fr); gap: 8px; }
+  .schedule-calendar__footer { flex-wrap: wrap; }
+}
+@media (max-width: 760px) {
+  .dashboard-layout:has(.schedule-page) { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-layout:has(.schedule-page) .dashboard-sidebar { min-width: 0; }
+}

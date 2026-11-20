@@ -8,7 +8,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "create-staff": "node scripts/createStaffAccount.js",
-    "test:integration": "node --test tests/workflows.test.js"
+    "test:integration": "node --test tests/workflows.test.js tests/availabilityRequests.test.js tests/availabilityRequestRules.test.js tests/scheduleAssignments.test.js"
   },
   "keywords": [],
   "author": "",

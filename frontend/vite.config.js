@@ -11,7 +11,12 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       proxy: {
-        '/api': env.VITE_API_PROXY_TARGET || `http://127.0.0.1:${backendEnv.PORT || 5000}`,
+        '/api': {
+          target: env.VITE_API_PROXY_TARGET || `http://127.0.0.1:${backendEnv.PORT || 5000}`,
+          // Preserve the browser's host so same-origin POSTs pass the API's origin check,
+          // including when Vite selects another available development port.
+          changeOrigin: false,
+        },
       },
     },
   }

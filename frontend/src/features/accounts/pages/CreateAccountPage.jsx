@@ -38,7 +38,7 @@ function CreateAccountPage() {
       return
     }
 
-    const passwordError = validatePassword(temporaryPassword)
+    const passwordError = temporaryPassword ? validatePassword(temporaryPassword) : ''
 
     if (passwordError) {
       setFeedback({
@@ -97,14 +97,14 @@ function CreateAccountPage() {
       <header className="page-header">
         <p className="page-eyebrow">User management</p>
         <h1 id="account-page-title">Create user account</h1>
-        <p>Create an account and assign its role. All fields are required.</p>
+        <p>Create an account and assign its role. Leave the temporary password blank to generate one.</p>
       </header>
 
       <form
         className="account-form"
         onSubmit={handleSubmit}
         onReset={handleReset}
-        onChange={() => setFeedback(null)}
+        onChange={() => { setFeedback(null); setCredentials(null) }}
       >
         <div className="form-field">
           <label htmlFor="name">Full name</label>
@@ -157,7 +157,7 @@ function CreateAccountPage() {
             aria-describedby="account-password-help"
             minLength={8}
             maxLength={72}
-            required
+            placeholder="Leave blank to generate one"
           />
           <p className="account-form__help" id="account-password-help">
             Use 8–72 characters, including a letter and a number.
