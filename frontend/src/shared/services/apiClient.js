@@ -1,5 +1,5 @@
 const API_URL = (
-  import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
+  import.meta.env.VITE_API_URL || 'http://localhost:5000'
 ).replace(/\/$/, '')
 
 let accessToken = null
@@ -16,7 +16,7 @@ export class ApiError extends Error {
   }
 }
 
-async function requestJson(path, { method = 'GET', body, signal } = {}) {
+export async function requestJson(path, { method = 'GET', body, signal } = {}) {
   const headers = {
     Accept: 'application/json',
   }
@@ -36,6 +36,7 @@ async function requestJson(path, { method = 'GET', body, signal } = {}) {
       method,
       headers,
       signal,
+      credentials: 'include',
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     })
   } catch (error) {
@@ -78,9 +79,6 @@ async function requestJson(path, { method = 'GET', body, signal } = {}) {
       response.status,
     )
   }
-  return data
-}
-
   return data
 }
 
