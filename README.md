@@ -20,21 +20,13 @@ ShiftEase is a web-based Employee Scheduling Management System designed to help 
 - User Account Management
 - Role Management
 
-## 4. Updates for PR #3
 
-- **Employee accounts.** When a manager saves a new employee record, ShiftEase creates an Employee login account or links an existing Employee account with the same email through `Employee.user`. Linking preserves the existing password. New accounts receive a temporary password.
-- **Administrator and employee APIs.** Administrators can list, create, update, and delete user accounts. Staff can view and update employee records, and employees can view their own profile. Changing a linked account's email updates the employee record. Deleting the login account removes the link and preserves the employee record.
-- **Sign-in and permissions.** The web app uses a session cookie. API clients can use a JWT when `JWT_SECRET` is configured. Access depends on the signed-in user's role. Users with a temporary password must choose a new password before using protected features.
-- **Availability and scheduling.** The frontend saves weekly availability and draft shifts through the API. The backend rejects overlapping availability and checks assigned employees for availability and overlapping shifts when a shift changes.
+Managers first save a day's work period, such as 08:00–18:00, then add each employee's own shift within it. An employee available from 10:00–14:00 can cover that part of the day. Multiple employees can work at the same time, and one employee can have separate, non-overlapping blocks. The candidate list shows approved availability for the selected work date after subtracting existing assignments.
 
-## 5. Postman API Testing
+Use **Copy to…** on a date card to fill other selected dates, Monday–Friday, or the whole displayed week. Copying changes drafts only. Existing draft hours require an explicit replacement choice. **Save selected days** validates and saves the selected dates as a single transaction; it does not copy employee assignments.
 
-The Postman collection ran through Newman against a separate local MongoDB replica set. **All 39 requests and 66 assertions passed.** The run used test accounts and did not modify the team's database.
+The assignment panel supports adding, editing, and removing personal shifts. A coverage strip and timeline show staffing and uncovered hours. Publishing with gaps asks the manager to review them; no minimum staffing level is assumed. Editing a published work day or its employee shifts returns that day to draft and requires publishing again.
 
-| Area | What passed |
-| --- | --- |
-| Login and access | Cookie and JWT login, rejection of incorrect passwords and unauthorized roles, and invalidation of old sessions after a password change or logout |
-| Accounts and employee records | Administrator account management, duplicate email rejection, manager account creation, and `Employee.user` linking that preserves the existing password |
-| Availability and scheduling | Employee availability submission, overlap rejection, draft shift creation, employee assignment, and rejection of a shift edit outside the assigned employee's availability |
+`Schedule.assignments` stores each employee, start time, and end time. The existing `employees` list remains synchronized for compatibility. Older records without assignments are read using their original hours and converted only when edited, without changing the original employee hours. No bulk migration is required. The legacy employee assignment API remains supported; new clients send `startTime` and `endTime` with `employeeId`. Individual shifts can be edited or removed through `/api/schedules/:id/assignments/:assignmentId`.
 
-To repeat the full collection, start ShiftEase against a disposable MongoDB replica set, configure `JWT_SECRET` on that test backend, and select a Postman environment with the test API address and test accounts. The collection checks API responses and database behavior. Browser interactions were outside the scope of this run.
+Validation: run `npm test` and `npm run build` in `frontend`. Backend integration tests use `TEST_MONGO_URI` pointing to a disposable local MongoDB replica set, followed by `npm run test:integration` in `backend`.

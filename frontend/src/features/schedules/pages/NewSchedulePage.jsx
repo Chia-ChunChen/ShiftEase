@@ -2,685 +2,304 @@ import { useEffect, useRef, useState } from 'react'
 import './NewSchedulePage.css'
 import FeedbackMessage from '../../../shared/components/FeedbackMessage.jsx'
 import CalendarDatePicker from '../../../shared/components/CalendarDatePicker.jsx'
-import {
-  getSchedules,
-  createSchedule,
-  getAvailableEmployees,
-  assignEmployee,
-  removeEmployee,
-} from '../services/scheduleService.js'
+import { getSchedules, createWeeklySchedule, getAvailableEmployees, assignEmployee,
+  updateAssignment, removeAssignment, updateSchedule, publishSchedule } from '../services/scheduleService.js'
+import { copyDayHours, validHours, minutes } from '../scheduleRules.js'
 
-const weekdayFormatter = new Intl.DateTimeFormat('en-US', {
-  weekday: 'short',
-})
-
-const dateFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-})
-
-function getDateKey(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-')
+const dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' })
+const keyFor = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+const labelFor = key => dateFormatter.format(new Date(`${key}T12:00:00`))
+const dayKey = schedule => String(schedule.shiftDate).slice(0, 10)
+const personName = person => typeof person === 'object' && person ? person.name : 'Employee'
+function weekFor(offset) {
+  const monday = new Date()
+  monday.setHours(12, 0, 0, 0)
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + offset * 7)
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(monday); date.setDate(date.getDate() + index); return date
+  })
 }
 
-function getWeekDates(offset) {
-  const today = new Date()
-  const monday = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  )
-
-  monday.setDate(
-    monday.getDate() - ((monday.getDay() + 6) % 7) + offset * 7,
-  )
-
-  return Array.from(
-    { length: 7 },
-    (_, index) =>
-      new Date(
-        monday.getFullYear(),
-        monday.getMonth(),
-        monday.getDate() + index,
-      ),
-  )
+function TimeFields({ id, value, onChange, disabled }) {
+  return <div className="schedule-date-card__times">
+    <label className="form-field" htmlFor={`${id}-start`}>Start time
+      <input id={`${id}-start`} type="time" required value={value.startTime || ''} disabled={disabled}
+        onChange={event => onChange({ ...value, startTime: event.target.value })} />
+    </label>
+    <label className="form-field" htmlFor={`${id}-end`}>End time
+      <input id={`${id}-end`} type="time" required value={value.endTime || ''} disabled={disabled}
+        onChange={event => onChange({ ...value, endTime: event.target.value })} />
+    </label>
+  </div>
 }
 
-function shiftDateKey(shift) {
-  return String(shift.shiftDate).slice(0, 10)
+function AssignedShift({ assignment, busy, onSave, onRemove }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState({ startTime: assignment.startTime, endTime: assignment.endTime })
+  return <li className="personal-shift">
+    <div className="personal-shift__heading"><div><strong>{personName(assignment.employee)}</strong>
+      <span>{assignment.employee?.position || 'Employee'} · {assignment.startTime}–{assignment.endTime}</span></div>
+      <div className="schedule-inline-actions">
+        {!editing && <button className="schedule-action" disabled={busy} onClick={() => {
+          setDraft({ startTime: assignment.startTime, endTime: assignment.endTime }); setEditing(true)
+        }}>Edit shift</button>}
+        <button className="schedule-action" disabled={busy} onClick={onRemove}>Remove</button>
+      </div>
+    </div>
+    {editing && <form className="personal-shift__form" onSubmit={async event => {
+      event.preventDefault()
+      if (await onSave(draft)) setEditing(false)
+    }}>
+      <TimeFields id={`edit-${assignment._id}`} value={draft} onChange={setDraft} disabled={busy} />
+      <div className="schedule-inline-actions"><button type="submit" className="schedule-action schedule-action--primary" disabled={busy}>Save shift</button>
+        <button type="button" className="schedule-action" disabled={busy} onClick={() => setEditing(false)}>Cancel</button></div>
+    </form>}
+  </li>
 }
 
-function shiftLabel(shift) {
-  const date = new Date(`${shiftDateKey(shift)}T00:00:00`)
-  return `${dateFormatter.format(date)} · ${shift.startTime}–${shift.endTime}`
+function Candidate({ employee, busy, onAdd }) {
+  const windows = employee.availableWindows || []
+  const [selectedWindow, setSelectedWindow] = useState('0')
+  const [times, setTimes] = useState(windows[0] || { startTime: '', endTime: '' })
+  return <form className="candidate-card" onSubmit={event => { event.preventDefault(); onAdd(times) }}>
+    <div><strong>{employee.name}</strong><p>{employee.position}</p></div>
+    <p className="candidate-card__availability">Available: {windows.map(window => `${window.startTime}–${window.endTime}`).join(', ')}</p>
+    {windows.length > 1 && <label className="assignment-field">Use available window
+      <select value={selectedWindow} disabled={busy} onChange={event => {
+        setSelectedWindow(event.target.value); setTimes(windows[Number(event.target.value)])
+      }}>{windows.map((window, index) => <option key={index} value={index}>{window.startTime}–{window.endTime}</option>)}</select>
+    </label>}
+    <TimeFields id={`candidate-${employee._id}`} value={times} onChange={setTimes} disabled={busy} />
+    <button type="submit" className="schedule-action schedule-action--primary" disabled={busy}>Add employee shift</button>
+  </form>
+}
+
+function Coverage({ day }) {
+  const duration = minutes(day.endTime) - minutes(day.startTime)
+  const gaps = (day.coverage || []).filter(segment => segment.employeeCount === 0)
+  return <section className="assignment-section" aria-labelledby="coverage-title">
+    <h3 id="coverage-title">Day coverage</h3>
+    <div className="coverage-axis"><span>{day.startTime}</span><span>{day.endTime}</span></div>
+    <div className="coverage-strip" aria-label="Number of employees covering each time period">
+      {(day.coverage || []).map(segment => <div key={segment.startTime} className={segment.employeeCount ? 'coverage-covered' : 'coverage-gap'}
+        style={{ flexGrow: minutes(segment.endTime) - minutes(segment.startTime) }}
+        title={`${segment.startTime}–${segment.endTime}: ${segment.employeeCount} employee(s)`}>
+        {segment.employeeCount}</div>)}
+    </div>
+    <p className={gaps.length ? 'schedule-warning' : 'schedule-covered'} role="status">{gaps.length
+      ? `Uncovered: ${gaps.map(gap => `${gap.startTime}–${gap.endTime}`).join(', ')}. Review staffing before publishing.`
+      : 'The entire work period has at least one employee assigned.'}</p>
+    <div className="schedule-timeline" aria-label="Employee shifts during this work period">
+      {(day.assignments || []).map(assignment => <div className="timeline-row" key={assignment._id}>
+        <span>{personName(assignment.employee)}</span><div className="timeline-track">
+          <div className="timeline-shift" style={{ left: `${100 * (minutes(assignment.startTime) - minutes(day.startTime)) / duration}%`,
+            width: `${100 * (minutes(assignment.endTime) - minutes(assignment.startTime)) / duration}%` }}
+            title={`${personName(assignment.employee)}: ${assignment.startTime}–${assignment.endTime}`}>
+            {assignment.startTime}–{assignment.endTime}</div>
+        </div>
+      </div>)}
+    </div>
+  </section>
 }
 
 function NewSchedulePage() {
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedDates, setSelectedDates] = useState([])
-  const [shiftHours, setShiftHours] = useState({})
+  const [hours, setHours] = useState({})
   const [calendarOpen, setCalendarOpen] = useState(false)
-
+  const [copySource, setCopySource] = useState('')
+  const [copyTargets, setCopyTargets] = useState([])
+  const [overwrite, setOverwrite] = useState(false)
   const [schedules, setSchedules] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [activeId, setActiveId] = useState('')
-
-  const [availableResult, setAvailableResult] = useState({
-    scheduleId: '',
-    version: -1,
-    employees: [],
-    error: '',
-  })
-  const [availableVersion, setAvailableVersion] = useState(0)
-  const [employeeId, setEmployeeId] = useState('')
-
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState(null)
   const [assignmentFeedback, setAssignmentFeedback] = useState(null)
   const [saveUncertain, setSaveUncertain] = useState(false)
-
-  const calendarButtonRef = useRef(null)
+  const [availableVersion, setAvailableVersion] = useState(0)
+  const [candidateResult, setCandidateResult] = useState({ id: '', version: -1, employees: [], error: '' })
+  const [editingDay, setEditingDay] = useState(false)
+  const [dayDraft, setDayDraft] = useState({ startTime: '', endTime: '' })
   const operationRef = useRef(false)
-
-  const weekDates = getWeekDates(weekOffset)
-  const weekStart = getDateKey(weekDates[0])
-  const weekEnd = getDateKey(weekDates[6])
-
-  const weeklySchedules = schedules
-    .filter((shift) => {
-      const date = shiftDateKey(shift)
-      return date >= weekStart && date <= weekEnd
-    })
-    .sort((a, b) =>
-      `${shiftDateKey(a)} ${a.startTime}`.localeCompare(
-        `${shiftDateKey(b)} ${b.startTime}`,
-      ),
-    )
-
-  const activeSchedule = weeklySchedules.find(
-    (shift) => shift._id === activeId,
-  )
-
-  const assignedEmployees = activeSchedule?.employees ?? []
-
-  const availableResultIsCurrent =
-    availableResult.scheduleId === activeId &&
-    availableResult.version === availableVersion
-
-  const available =
-    activeId && availableResultIsCurrent
-      ? availableResult.employees
-      : []
-
-  const availableLoading =
-    Boolean(activeId) && !availableResultIsCurrent
-
-  const availableError =
-    activeId && availableResultIsCurrent
-      ? availableResult.error
-      : ''
+  const calendarButtonRef = useRef(null)
+  const dates = weekFor(weekOffset)
+  const keys = dates.map(keyFor)
+  const weekly = schedules.filter(day => dayKey(day) >= keys[0] && dayKey(day) <= keys[6])
+    .sort((a, b) => `${dayKey(a)} ${a.startTime}`.localeCompare(`${dayKey(b)} ${b.startTime}`))
+  const active = weekly.find(day => day._id === activeId) || weekly[0]
+  const selectedId = active?._id || ''
+  const resultCurrent = candidateResult.id === selectedId && candidateResult.version === availableVersion
 
   useEffect(() => {
-    const controller = new AbortController()
-
-    getSchedules({ signal: controller.signal })
-      .then(setSchedules)
-      .catch((error) => {
-        if (error.name !== 'AbortError') setLoadError(error.message)
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false)
-      })
-
-    return () => controller.abort()
+    const abort = new AbortController()
+    getSchedules({ signal: abort.signal }).then(result => {
+      if (!abort.signal.aborted) setSchedules(result)
+    }).catch(error => { if (error.name !== 'AbortError') setLoadError(error.message) })
+      .finally(() => { if (!abort.signal.aborted) setLoading(false) })
+    return () => abort.abort()
   }, [])
 
   useEffect(() => {
-    if (!activeId) return
-
-    const controller = new AbortController()
-
-    getAvailableEmployees(activeId, {
-      signal: controller.signal,
+    if (!selectedId) return
+    const abort = new AbortController()
+    getAvailableEmployees(selectedId, { signal: abort.signal }).then(employees => {
+      if (!abort.signal.aborted) setCandidateResult({ id: selectedId, version: availableVersion, employees, error: '' })
+    }).catch(error => {
+      if (!abort.signal.aborted) setCandidateResult({ id: selectedId, version: availableVersion, employees: [], error: error.message })
     })
-      .then((employees) => {
-        if (controller.signal.aborted) return
+    return () => abort.abort()
+  }, [selectedId, availableVersion])
 
-        setAvailableResult({
-          scheduleId: activeId,
-          version: availableVersion,
-          employees,
-          error: '',
-        })
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) return
-
-        setAvailableResult({
-          scheduleId: activeId,
-          version: availableVersion,
-          employees: [],
-          error: error.message,
-        })
-      })
-
-    return () => controller.abort()
-  }, [activeId, availableVersion])
-
-  async function refreshSchedules() {
-    if (operationRef.current) return
-
-    operationRef.current = true
-    setLoading(true)
-    setLoadError('')
-
-    try {
-      const result = await getSchedules()
-      setSchedules(result)
-      setSaveUncertain(false)
-      setAvailableVersion((current) => current + 1)
-    } catch (error) {
-      setLoadError(error.message)
-    } finally {
-      setLoading(false)
-      operationRef.current = false
-    }
-  }
-
-  function moveToWeek(offset) {
-    if (busy || loading) return false
+  function moveWeek(offset) {
+    if (busy || operationRef.current) return false
     if (offset === weekOffset) return true
-
-    if (
-      selectedDates.length > 0 &&
-      !window.confirm('Leave this week and discard unsaved shift selections?')
-    ) {
-      return false
-    }
-
-    setWeekOffset(offset)
-    setSelectedDates([])
-    setShiftHours({})
-    setActiveId('')
-    setEmployeeId('')
-    setFeedback(null)
-    setAssignmentFeedback(null)
+    if ((selectedDates.length || editingDay) && !window.confirm('Discard unsaved draft changes and change week?')) return false
+    setWeekOffset(offset); setSelectedDates([]); setHours({}); setActiveId(''); setCopySource('')
+    setEditingDay(false); setFeedback(null); setAssignmentFeedback(null)
     return true
   }
-
-  function closeCalendar() {
-    setCalendarOpen(false)
-    requestAnimationFrame(() => calendarButtonRef.current?.focus())
-  }
-
   function selectCalendarDate(date) {
-    const monday = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-    )
-
-    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
-    const currentMonday = getWeekDates(0)[0]
-
-    const stamp = (value) =>
-      Date.UTC(value.getFullYear(), value.getMonth(), value.getDate())
-
-    const offset = Math.round(
-      (stamp(monday) - stamp(currentMonday)) / 604800000,
-    )
-
-    if (moveToWeek(offset)) closeCalendar()
+    const monday = new Date(date); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+    const current = weekFor(0)[0]
+    const stamp = value => Date.UTC(value.getFullYear(), value.getMonth(), value.getDate())
+    if (moveWeek(Math.round((stamp(monday) - stamp(current)) / 604800000))) setCalendarOpen(false)
   }
-
-  function toggleDate(date) {
-    const key = getDateKey(date)
-    setFeedback(null)
-    setSelectedDates((current) =>
-      current.includes(key)
-        ? current.filter((item) => item !== key)
-        : [...current, key].sort(),
-    )
+  function changeHours(date, value) { setHours(current => ({ ...current, [date]: value })); setFeedback(null) }
+  function applyCopy() {
+    try {
+      setHours(copyDayHours(hours, copySource, copyTargets, overwrite))
+      setSelectedDates(current => [...new Set([...current, ...copyTargets])].sort())
+      setFeedback({ variant: 'success', message: `Work hours copied to ${copyTargets.length} date(s). Save selected days to store them.` })
+      setCopySource('')
+    } catch (error) { setFeedback({ variant: 'error', message: error.message }) }
   }
-
-  function updateHours(key, field, value) {
-    setFeedback(null)
-    setShiftHours((current) => ({
-      ...current,
-      [key]: { ...current[key], [field]: value },
-    }))
+  async function refreshSchedules() {
+    if (operationRef.current) return
+    operationRef.current = true; setLoading(true); setLoadError('')
+    try { setSchedules(await getSchedules()); setSaveUncertain(false); setAvailableVersion(value => value + 1) }
+    catch (error) { setLoadError(error.message) }
+    finally { operationRef.current = false; setLoading(false) }
   }
-
-  async function saveSelectedShifts() {
+  async function saveDays() {
     if (operationRef.current || saveUncertain) return
-
-    const drafts = selectedDates.map((shiftDate) => ({
-      shiftDate,
-      startTime: shiftHours[shiftDate]?.startTime ?? '',
-      endTime: shiftHours[shiftDate]?.endTime ?? '',
-    }))
-
-    if (!drafts.length) return
-
-    const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/
-
-    for (const draft of drafts) {
-      if (
-        !timePattern.test(draft.startTime) ||
-        !timePattern.test(draft.endTime) ||
-        draft.endTime <= draft.startTime
-      ) {
-        setFeedback({
-          variant: 'error',
-          message: `${draft.shiftDate}: enter valid hours with the end after the start.`,
-        })
-        return
-      }
-
-      const duplicate = schedules.some(
-        (shift) =>
-          shiftDateKey(shift) === draft.shiftDate &&
-          shift.startTime === draft.startTime &&
-          shift.endTime === draft.endTime,
-      )
-
-      if (duplicate) {
-        setFeedback({
-          variant: 'error',
-          message: `${draft.shiftDate}: this time range already exists. Select the saved shift below.`,
-        })
-        return
+    const entries = selectedDates.map(shiftDate => ({ shiftDate, ...hours[shiftDate] }))
+    for (const entry of entries) {
+      if (!validHours(entry)) { setFeedback({ variant: 'error', message: `${entry.shiftDate}: enter valid work hours.` }); return }
+      if (schedules.some(day => dayKey(day) === entry.shiftDate && day.startTime === entry.startTime && day.endTime === entry.endTime)) {
+        setFeedback({ variant: 'error', message: `${entry.shiftDate}: this work period is already saved. Select it on the right.` }); return
       }
     }
-
-    operationRef.current = true
-    setBusy(true)
-    setFeedback(null)
-    let savedCount = 0
-
+    if (!entries.length) return
+    operationRef.current = true; setBusy(true); setFeedback(null)
     try {
-      for (const draft of drafts) {
-        const saved = await createSchedule(draft)
-        savedCount += 1
-
-        setSchedules((current) => [...current, saved])
-        setSelectedDates((current) =>
-          current.filter((date) => date !== draft.shiftDate),
-        )
-        setActiveId(saved._id)
-        setEmployeeId('')
-      }
-
-      setFeedback({
-        variant: 'success',
-        message: `${savedCount} shift(s) saved. Select a saved shift to assign employees.`,
-      })
+      const saved = await createWeeklySchedule(entries)
+      setSchedules(current => [...current, ...saved]); setActiveId(saved[0]._id)
+      setSelectedDates([]); setHours({}); setCopySource(''); setEditingDay(false)
+      setAvailableVersion(value => value + 1)
+      setFeedback({ variant: 'success', message: `${saved.length} work day(s) saved. Add each employee's personal shift on the right.` })
     } catch (error) {
       setSaveUncertain(true)
-      setFeedback({
-        variant: 'error',
-        message:
-          `${savedCount} shift(s) confirmed saved. ${error.message} ` +
-          'Refresh saved shifts before trying again to check what was stored.',
-      })
-    } finally {
-      setBusy(false)
-      operationRef.current = false
-    }
+      setFeedback({ variant: 'error', message: `${error.message} Refresh saved days before retrying to check whether the batch was stored.` })
+    } finally { operationRef.current = false; setBusy(false) }
   }
-
-  async function changeAssignment(action, id) {
-    if (operationRef.current || !activeSchedule) return
-
-    operationRef.current = true
-    setBusy(true)
-    setAssignmentFeedback(null)
-
+  async function mutate(operation, message) {
+    if (operationRef.current || !active) return false
+    operationRef.current = true; setBusy(true); setAssignmentFeedback(null)
     try {
-      const updated =
-        action === 'add'
-          ? await assignEmployee(activeId, id)
-          : await removeEmployee(activeId, id)
-
-      setSchedules((current) =>
-        current.map((shift) =>
-          shift._id === updated._id ? updated : shift,
-        ),
-      )
-
-      setEmployeeId('')
-      setAssignmentFeedback({
-        variant: 'success',
-        message:
-          action === 'add'
-            ? 'Employee assigned successfully.'
-            : 'Employee removed successfully.',
-      })
-    } catch (error) {
-      setAssignmentFeedback({
-        variant: 'error',
-        message: `${error.message} Refresh saved shifts if the result is uncertain.`,
-      })
-    } finally {
-      setAvailableVersion((current) => current + 1)
-      setBusy(false)
-      operationRef.current = false
-    }
+      const updated = await operation()
+      setSchedules(current => current.map(day => day._id === updated._id ? updated : day))
+      setAssignmentFeedback({ variant: 'success', message }); return true
+    } catch (error) { setAssignmentFeedback({ variant: 'error', message: error.message }); return false }
+    finally { operationRef.current = false; setBusy(false); setAvailableVersion(value => value + 1) }
+  }
+  async function publishDay() {
+    const gaps = (active.coverage || []).filter(segment => segment.employeeCount === 0)
+    if (gaps.length && !window.confirm(`Uncovered hours: ${gaps.map(gap => `${gap.startTime}–${gap.endTime}`).join(', ')}. Publish this day anyway?`)) return
+    await mutate(() => publishSchedule(active._id), 'Work day published. Changes to hours or employee shifts will return it to draft.')
   }
 
-  return (
-    <section className="schedule-page" aria-labelledby="schedule-page-title">
-      <header className="schedule-page__header">
-        <p className="schedule-page__eyebrow">Scheduling</p>
-        <h1 id="schedule-page-title">Create weekly schedule</h1>
-        <p>Save shift dates and hours, then assign available employees.</p>
-      </header>
-
-      <div className="schedule-page__layout">
-        <section className="schedule-calendar" aria-label="Schedule calendar">
-          {calendarOpen ? (
-            <CalendarDatePicker
-              initialDate={weekDates[0]}
-              onSelect={selectCalendarDate}
-              onCancel={closeCalendar}
-            />
-          ) : (
-            <>
-              <div className="schedule-calendar__navigation">
-                <button
-                  type="button"
-                  disabled={busy || loading}
-                  onClick={() => moveToWeek(weekOffset - 1)}
-                >
-                  Previous week
-                </button>
-
-                <h2>
-                  {dateFormatter.format(weekDates[0])}
-                  {' – '}
-                  {dateFormatter.format(weekDates[6])}
-                </h2>
-
-                <button
-                  type="button"
-                  disabled={busy || loading}
-                  onClick={() => moveToWeek(weekOffset + 1)}
-                >
-                  Next week
-                </button>
-              </div>
-
-              <div className="schedule-calendar__days">
-                {weekDates.map((date) => {
-                  const key = getDateKey(date)
-                  const selected = selectedDates.includes(key)
-
-                  return (
-                    <button
-                      key={key}
-                      className={`schedule-calendar__day${selected ? ' is-selected' : ''}`}
-                      type="button"
-                      disabled={busy}
-                      aria-pressed={selected}
-                      aria-label={dateFormatter.format(date)}
-                      onClick={() => toggleDate(date)}
-                    >
-                      <span>{weekdayFormatter.format(date)}</span>
-                      <strong>{date.getDate()}</strong>
-                    </button>
-                  )
-                })}
-              </div>
-
-              <p className="schedule-calendar__selection" role="status">
-                {selectedDates.length
-                  ? `${selectedDates.length} date(s) selected for new shifts.`
-                  : 'Select dates to create new shifts.'}
-              </p>
-
-              {selectedDates.map((key) => (
-                <article className="schedule-date-card" key={key}>
-                  <h3>
-                    {dateFormatter.format(new Date(`${key}T00:00:00`))}
-                  </h3>
-                  <div className="schedule-date-card__times">
-                    {['startTime', 'endTime'].map((field) => (
-                      <div className="form-field" key={field}>
-                        <label htmlFor={`${key}-${field}`}>
-                          {field === 'startTime' ? 'Start time' : 'End time'}
-                        </label>
-                        <input
-                          id={`${key}-${field}`}
-                          type="time"
-                          disabled={busy}
-                          value={shiftHours[key]?.[field] ?? ''}
-                          onChange={(event) =>
-                            updateHours(key, field, event.target.value)
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </article>
-              ))}
-
-              {feedback && (
-                <FeedbackMessage variant={feedback.variant}>
-                  {feedback.message}
-                </FeedbackMessage>
-              )}
-
-              <div className="schedule-calendar__footer">
-                <button
-                  ref={calendarButtonRef}
-                  className="schedule-calendar__open-picker"
-                  type="button"
-                  disabled={busy || loading}
-                  aria-label="Open calendar to choose a week"
-                  title="Choose a week"
-                  onClick={() => setCalendarOpen(true)}
-                >
-                  <svg
-                    width="22"
-                    height="22"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <rect x="3" y="5" width="18" height="16" rx="2" />
-                    <path d="M16 3v4M8 3v4M3 11h18" />
-                    <path d="M8 15h2M14 15h2M8 18h2" />
-                  </svg>
-                </button>
-
-                <button
-                  className="button button--primary"
-                  type="button"
-                  disabled={
-                    busy ||
-                    loading ||
-                    Boolean(loadError) ||
-                    saveUncertain ||
-                    selectedDates.length === 0
-                  }
-                  onClick={saveSelectedShifts}
-                >
-                  {busy ? 'Working…' : 'Save selected shifts'}
-                </button>
-              </div>
-            </>
-          )}
-        </section>
-
-        <aside className="schedule-preview" aria-labelledby="assignment-title">
-          <h2 id="assignment-title">Employee assignment</h2>
-          <p>Select a saved shift to manage its employees.</p>
-
-          <button
-            className="schedule-action"
-            type="button"
-            disabled={loading || busy}
-            onClick={refreshSchedules}
-          >
-            {loading ? 'Loading shifts…' : 'Refresh saved shifts'}
-          </button>
-
-          {loadError && (
-            <FeedbackMessage variant="error">
-              {loadError}
-            </FeedbackMessage>
-          )}
-
-          {!loading && !loadError && weeklySchedules.length === 0 && (
-            <p>No saved shifts for this week. Save a shift to get started.</p>
-          )}
-
-          {weeklySchedules.length > 0 && (
-            <div className="assignment-field">
-              <label htmlFor="saved-shift">Saved shift</label>
-              <select
-                id="saved-shift"
-                value={activeSchedule ? activeId : ''}
-                disabled={busy || loading || Boolean(loadError)}
-                onChange={(event) => {
-                  setActiveId(event.target.value)
-                  setEmployeeId('')
-                  setAssignmentFeedback(null)
-                }}
-              >
-                <option value="">Select a shift</option>
-                {weeklySchedules.map((shift) => (
-                  <option key={shift._id} value={shift._id}>
-                    {shiftLabel(shift)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {activeSchedule && !loading && !loadError && (
-            <>
-              <section className="assignment-section">
-                <h3>Assigned employees</h3>
-
-                {assignedEmployees.length === 0 ? (
-                  <p>No employees assigned yet.</p>
-                ) : (
-                  <ul className="assignment-list">
-                    {assignedEmployees.map((employee) => {
-                      const id =
-                        typeof employee === 'string'
-                          ? employee
-                          : employee._id
-
-                      return (
-                        <li key={id}>
-                          <div>
-                            <strong>
-                              {typeof employee === 'string'
-                                ? 'Employee details not loaded'
-                                : employee.name}
-                            </strong>
-                            {employee.position && (
-                              <span>{employee.position}</span>
-                            )}
-                          </div>
-                          <button
-                            className="schedule-action"
-                            type="button"
-                            disabled={busy}
-                            aria-label={`Remove ${employee.name || 'employee'} from shift`}
-                            onClick={() => changeAssignment('remove', id)}
-                          >
-                            Remove
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </section>
-
-              <section className="assignment-section">
-                <h3>Available employees</h3>
-
-                {availableLoading ? (
-                  <p role="status">Loading available employees…</p>
-                ) : availableError ? (
-                  <>
-                    <FeedbackMessage variant="error">
-                      {availableError}
-                    </FeedbackMessage>
-                    <button
-                      className="schedule-action"
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        setAvailableVersion((current) => current + 1)
-                      }
-                    >
-                      Retry
-                    </button>
-                  </>
-                ) : available.length === 0 ? (
-                  <p>No additional employees are available for this shift.</p>
-                ) : (
-                  <form
-                    className="assignment-field"
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      if (employeeId) changeAssignment('add', employeeId)
-                    }}
-                  >
-                    <label htmlFor="available-employee">Employee</label>
-                    <select
-                      id="available-employee"
-                      value={employeeId}
-                      required
-                      disabled={busy}
-                      onChange={(event) => setEmployeeId(event.target.value)}
-                    >
-                      <option value="">Select an employee</option>
-                      {available.map((employee) => (
-                        <option key={employee._id} value={employee._id}>
-                          {employee.name}
-                          {employee.position ? ` · ${employee.position}` : ''}
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
-                      className="schedule-action schedule-action--primary"
-                      type="submit"
-                      disabled={busy || !employeeId}
-                    >
-                      {busy ? 'Working…' : 'Assign employee'}
-                    </button>
-                  </form>
-                )}
-              </section>
-            </>
-          )}
-
-          {assignmentFeedback && (
-            <FeedbackMessage variant={assignmentFeedback.variant}>
-              {assignmentFeedback.message}
-            </FeedbackMessage>
-          )}
-        </aside>
-      </div>
-    </section>
-  )
+  return <section className="schedule-page" aria-labelledby="schedule-page-title">
+    <header className="schedule-page__header"><p className="schedule-page__eyebrow">Scheduling</p>
+      <h1 id="schedule-page-title">Create weekly schedule</h1>
+      <p>Set each day's work hours, copy them to other dates, then give each employee their own shift.</p>
+    </header>
+    <div className="schedule-page__layout">
+      <section className="schedule-calendar" aria-labelledby="work-days-title">
+        <div><h2 id="work-days-title">1. Set work days</h2><p className="schedule-help">These hours describe the work period to cover. Employees can cover different parts of it.</p></div>
+        <div className="schedule-calendar__navigation"><button disabled={busy || loading} onClick={() => moveWeek(weekOffset - 1)}>Previous week</button>
+          <h3>{labelFor(keys[0])} – {labelFor(keys[6])}</h3><button disabled={busy || loading} onClick={() => moveWeek(weekOffset + 1)}>Next week</button></div>
+        <div className="schedule-calendar__days">{dates.map((date, index) => <button key={keys[index]} className={`schedule-calendar__day ${selectedDates.includes(keys[index]) ? 'is-selected' : ''}`}
+          aria-pressed={selectedDates.includes(keys[index])} aria-label={`Select ${labelFor(keys[index])}`} disabled={busy || loading} onClick={() => {
+            const dateKey = keys[index]; setSelectedDates(current => current.includes(dateKey) ? current.filter(value => value !== dateKey) : [...current, dateKey].sort()); setCopySource(''); setFeedback(null)
+          }}><span>{weekdayFormatter.format(date)}</span><strong>{date.getDate()}</strong></button>)}</div>
+        <p className="schedule-calendar__selection">{selectedDates.length} date(s) selected. Choose a date above to enter its work hours.</p>
+        {selectedDates.map(date => <section className="schedule-date-card" key={date}>
+          <div className="schedule-date-card__heading"><h3>{labelFor(date)}</h3><button className="schedule-action" disabled={busy} onClick={() => {
+            setCopySource(copySource === date ? '' : date); setCopyTargets(selectedDates.filter(value => value !== date)); setOverwrite(false)
+          }}>Copy to…</button></div>
+          <TimeFields id={`day-${date}`} value={hours[date] || {}} onChange={value => changeHours(date, value)} disabled={busy} />
+          {copySource === date && <fieldset className="copy-days" disabled={busy}><legend>Copy work hours to</legend>
+            <div className="schedule-inline-actions"><button type="button" className="schedule-action" onClick={() => setCopyTargets(selectedDates.filter(value => value !== date))}>Other selected dates</button>
+              <button type="button" className="schedule-action" onClick={() => setCopyTargets(keys.slice(0, 5).filter(value => value !== date))}>Mon–Fri</button>
+              <button type="button" className="schedule-action" onClick={() => setCopyTargets(keys.filter(value => value !== date))}>Whole week</button></div>
+            <div className="copy-days__options">{keys.filter(value => value !== date).map(value => <label key={value}>
+              <input type="checkbox" checked={copyTargets.includes(value)} onChange={event => setCopyTargets(current => event.target.checked ? [...current, value] : current.filter(item => item !== value))} />
+              {weekdayFormatter.format(new Date(`${value}T12:00:00`))} {value.slice(5)}{hours[value]?.startTime || hours[value]?.endTime ? ' · has draft hours' : ''}</label>)}</div>
+            <label className="copy-days__replace"><input type="checkbox" checked={overwrite} onChange={event => setOverwrite(event.target.checked)} />Replace existing draft hours</label>
+            <p className="schedule-help">Copies only work hours into the draft. Saved days and employee shifts are not changed.</p>
+            <div className="schedule-inline-actions"><button className="schedule-action schedule-action--primary" onClick={applyCopy}>Copy hours</button><button className="schedule-action" onClick={() => setCopySource('')}>Cancel</button></div>
+          </fieldset>}
+        </section>)}
+        <div className="schedule-calendar__footer"><button ref={calendarButtonRef} className="schedule-action" disabled={busy} onClick={() => setCalendarOpen(true)}>Choose week…</button>
+          <button className="schedule-action schedule-action--primary" disabled={busy || loading || !selectedDates.length || saveUncertain} onClick={saveDays}>{busy ? 'Saving…' : 'Save selected days'}</button></div>
+        {calendarOpen && <CalendarDatePicker initialDate={dates[0]} onSelect={selectCalendarDate} onCancel={() => {
+          setCalendarOpen(false); requestAnimationFrame(() => calendarButtonRef.current?.focus())
+        }} />}
+        {feedback && <FeedbackMessage variant={feedback.variant}>{feedback.message}</FeedbackMessage>}
+      </section>
+      <aside className="schedule-preview" aria-labelledby="assignment-title">
+        <div className="schedule-date-card__heading"><h2 id="assignment-title">2. Arrange employee shifts</h2>
+          <button className="schedule-action" disabled={busy || loading} onClick={refreshSchedules}>{loading ? 'Loading…' : 'Refresh saved days'}</button></div>
+        {loadError && <FeedbackMessage variant="error">{loadError}</FeedbackMessage>}
+        {!loading && !loadError && !weekly.length && <p>No saved work days in this week. Save your selected days first.</p>}
+        {active && !loadError && <>
+          <label className="assignment-field">Saved work day<select value={selectedId} disabled={busy || loading} onChange={event => {
+            if (editingDay && !window.confirm('Discard unsaved work hour edits?')) return
+            setActiveId(event.target.value); setEditingDay(false); setAssignmentFeedback(null)
+          }}>{weekly.map(day => <option key={day._id} value={day._id}>{labelFor(dayKey(day))} · {day.startTime}–{day.endTime} · {day.status}</option>)}</select></label>
+          <div className="work-day-summary"><span className={`day-status ${active.status === 'published' ? 'day-status--published' : ''}`}>{active.status === 'published' ? 'Published' : 'Draft'}</span>
+            {!editingDay && <button className="schedule-action" disabled={busy} onClick={() => { setDayDraft({ startTime: active.startTime, endTime: active.endTime }); setEditingDay(true) }}>Edit work hours</button>}
+            <button className="schedule-action schedule-action--primary" disabled={busy || !active.assignments?.length || active.status === 'published'} onClick={publishDay}>Publish day</button></div>
+          {editingDay && <form className="schedule-date-card" onSubmit={async event => {
+            event.preventDefault()
+            if (await mutate(() => updateSchedule(active._id, { shiftDate: dayKey(active), ...dayDraft }), 'Work hours updated. Employee shifts were checked.')) setEditingDay(false)
+          }}><TimeFields id="edit-day" value={dayDraft} onChange={setDayDraft} disabled={busy} />
+            <p className="schedule-help">Employee shifts must remain inside these hours. Changing a published day returns it to draft.</p>
+            <div className="schedule-inline-actions"><button className="schedule-action schedule-action--primary" type="submit" disabled={busy}>Save work hours</button><button className="schedule-action" type="button" disabled={busy} onClick={() => setEditingDay(false)}>Cancel</button></div>
+          </form>}
+          {assignmentFeedback && <FeedbackMessage variant={assignmentFeedback.variant}>{assignmentFeedback.message}</FeedbackMessage>}
+          <Coverage day={active} />
+          <section className="assignment-section"><h3>Assigned employee shifts</h3>
+            {!active.assignments?.length ? <p>No employee shifts yet. Add employees below to cover this work period.</p> : <ul className="assignment-list">
+              {active.assignments.map(assignment => <AssignedShift key={assignment._id} assignment={assignment} busy={busy}
+                onSave={times => mutate(() => updateAssignment(active._id, assignment._id, times), 'Employee shift updated.')}
+                onRemove={() => mutate(() => removeAssignment(active._id, assignment._id), 'Employee shift removed.')} />)}
+            </ul>}
+          </section>
+          <section className="assignment-section"><h3>Available employees</h3><p>Choose personal shift hours within the available windows below. Existing assignments are already excluded.</p>
+            {!resultCurrent ? <p role="status">Checking availability…</p> : candidateResult.error ? <>
+              <FeedbackMessage variant="error">{candidateResult.error}</FeedbackMessage><button className="schedule-action" disabled={busy} onClick={() => setAvailableVersion(value => value + 1)}>Retry availability</button>
+            </> : !candidateResult.employees.length ? <p>No remaining available time for this work period.</p> : candidateResult.employees.map(employee =>
+              <Candidate key={`${employee._id}-${availableVersion}`} employee={employee} busy={busy}
+                onAdd={times => mutate(() => assignEmployee(active._id, employee._id, times), 'Employee shift added.')} />)}
+          </section>
+        </>}
+      </aside>
+    </div>
+  </section>
 }
 
 export default NewSchedulePage

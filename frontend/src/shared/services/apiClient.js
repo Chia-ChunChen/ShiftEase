@@ -34,9 +34,9 @@ export async function requestJson(path, { method = 'GET', body, signal } = {}) {
   try {
     response = await fetch(`${API_URL}${path}`, {
       method,
+      credentials: 'include',
       headers,
       signal,
-      credentials: 'include',
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     })
   } catch (error) {
@@ -63,6 +63,10 @@ export async function requestJson(path, { method = 'GET', body, signal } = {}) {
   }
 
   if (!response.ok) {
+    if (response.status === 401 && path !== '/api/users/login') {
+      accessToken = null
+      window.dispatchEvent(new Event('shiftease:session-ended'))
+    }
     const defaultMessages = {
       400: 'Check the information and try again.',
       401: 'Please sign in again to continue.',

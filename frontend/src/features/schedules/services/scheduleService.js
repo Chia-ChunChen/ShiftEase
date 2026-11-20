@@ -89,14 +89,14 @@ export async function getAvailableEmployees(scheduleId, options = {}) {
   return readList(response)
 }
 
-export async function assignEmployee(scheduleId, employeeId) {
+export async function assignEmployee(scheduleId, employeeId, times = {}) {
   if (!employeeId) {
     throw new Error('Select an employee to assign.')
   }
 
   const response = await putJson(
     `${schedulePath(scheduleId)}/employees`,
-    { employeeId },
+    { employeeId, ...times },
   )
 
   return readSchedule(response)
@@ -120,5 +120,20 @@ export async function publishSchedule(scheduleId) {
     {},
   )
 
+  return readSchedule(response)
+}
+
+export async function createWeeklySchedule(entries) {
+  const response = await postJson('/api/schedules/weekly', { entries: entries.map(validateShift) })
+  return readList(response)
+}
+
+export async function updateAssignment(scheduleId, assignmentId, times) {
+  const response = await putJson(`${schedulePath(scheduleId)}/assignments/${encodeURIComponent(assignmentId)}`, times)
+  return readSchedule(response)
+}
+
+export async function removeAssignment(scheduleId, assignmentId) {
+  const response = await deleteJson(`${schedulePath(scheduleId)}/assignments/${encodeURIComponent(assignmentId)}`)
   return readSchedule(response)
 }

@@ -1,5 +1,6 @@
 const Employee = require("../models/Employee");
 const availabilityService = require("../services/availabilityService");
+const requestService = require("../services/availabilityRequestService");
 const httpError = require("../lib/httpError");
 
 async function ownEmployee(req) {
@@ -48,4 +49,36 @@ async function getAllAvailability(req, res) {
   }
 }
 
-module.exports = { createAvailabilityController, createWeeklyAvailability, getAllAvailability };
+async function getCurrentAvailability(req, res) {
+  try {
+    return res.json({ data: await requestService.current(await ownEmployee(req)) });
+  } catch (error) { return availabilityError(error, res); }
+}
+
+async function getMyRequests(req, res) {
+  try {
+    return res.json({ data: await requestService.mine(await ownEmployee(req)) });
+  } catch (error) { return availabilityError(error, res); }
+}
+
+async function submitRequest(req, res) {
+  try {
+    const { request, created } = await requestService.submit(await ownEmployee(req), req.body);
+    return res.status(created ? 201 : 200).json({ data: request });
+  } catch (error) { return availabilityError(error, res); }
+}
+
+async function getRequests(req, res) {
+  try {
+    return res.json({ data: await requestService.list(req.query.status) });
+  } catch (error) { return availabilityError(error, res); }
+}
+
+async function approveRequest(req, res) {
+  try {
+    return res.json({ data: await requestService.approve(req.params.id, req.user._id) });
+  } catch (error) { return availabilityError(error, res); }
+}
+
+module.exports = { createAvailabilityController, createWeeklyAvailability, getAllAvailability,
+  getCurrentAvailability, getMyRequests, submitRequest, getRequests, approveRequest };

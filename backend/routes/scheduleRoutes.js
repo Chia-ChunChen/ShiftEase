@@ -25,6 +25,8 @@ router.put("/:id", scheduleController.updateSchedule);
 
 // Assign an employee
 router.put("/:id/employees", scheduleController.assignEmployee);
+router.put('/:id/assignments/:assignmentId', scheduleController.updateAssignment);
+router.delete('/:id/assignments/:assignmentId', scheduleController.removeAssignment);
 
 // Remove an employee
 router.delete(
