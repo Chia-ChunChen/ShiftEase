@@ -18,9 +18,6 @@ import AvailabilityPage from '../features/availability/pages/AvailabilityPage.js
 import EmployeeRequestsPage from '../features/availability/pages/EmployeeRequestsPage.jsx'
 import AdminRequestsPage from '../features/accounts/pages/AdminRequestsPage.jsx'
 import AvailabilityRequestsPage from '../features/availability/pages/AvailabilityRequestsPage.jsx'
-import { requestJson } from '../shared/services/apiClient.js'
-import FeedbackMessage from '../shared/components/FeedbackMessage.jsx'
-import { ROLES } from './roles.js'
 
 function App() {
   const [user, setUser] = useState(undefined)
@@ -116,33 +113,14 @@ function App() {
       <Route
         path={ROUTES.LOGIN}
         element={
-          user ? (
-            <Navigate to={landing} replace />
-          ) : (
-            <AuthLayout>
-              <LoginPage onSignIn={setUser} />
-            </AuthLayout>
-          )
+          <AuthLayout>
+            <LoginPage />
+          </AuthLayout>
         }
       />
-<Route
-  path={ROUTES.PROFILE}
-  element={protectedPage(
-    ROUTES.PROFILE,
-    <ProfilePage
-      user={user}
-      onPasswordChanged={() => setUser(null)}
-    />
-  )}
-/>
-
-<Route
-  path={ROUTES.ADMIN_HOME}
-  element={protectedPage(ROUTES.ADMIN_HOME, <AdminHomePage />)}
-/>
-
-<Route path={ROUTES.MANAGER_HOME} element={<ManagerHomePage />} />
-<Route path={ROUTES.EMPLOYEE_HOME} element={<EmployeeHomePage />} />
+      <Route path={ROUTES.ADMIN_HOME} element={<AdminHomePage />} />
+      <Route path={ROUTES.MANAGER_HOME} element={<ManagerHomePage />} />
+      <Route path={ROUTES.EMPLOYEE_HOME} element={<EmployeeHomePage />} />
 
       <Route
         path={ROUTES.ADMIN_ACCOUNTS}
