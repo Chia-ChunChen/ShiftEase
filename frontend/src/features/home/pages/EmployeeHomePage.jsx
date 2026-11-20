@@ -1,12 +1,9 @@
 import { Link } from 'react-router'
-import DashboardLayout from '../../../layouts/DashboardLayout.jsx'
-import { ROLES } from '../../../app/roles.js'
 import { ROUTES } from '../../../app/routes.js'
 import './EmployeeHomePage.css'
 
 function EmployeeHomePage() {
   return (
-    <DashboardLayout role={ROLES.EMPLOYEE}>
       <section
         className="employee-home"
         aria-labelledby="employee-home-title"
@@ -51,7 +48,6 @@ function EmployeeHomePage() {
           </section>
         </div>
       </section>
-    </DashboardLayout>
   )
 }
 

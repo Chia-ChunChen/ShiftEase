@@ -1,12 +1,9 @@
 import { Link } from 'react-router'
-import DashboardLayout from '../../../layouts/DashboardLayout.jsx'
-import { ROLES } from '../../../app/roles.js'
 import { ROUTES } from '../../../app/routes.js'
 import './ManagerHomePage.css'
 
 function ManagerHomePage() {
   return (
-    <DashboardLayout role={ROLES.MANAGER}>
       <section
         className="manager-home"
         aria-labelledby="manager-home-title"
@@ -53,7 +50,6 @@ function ManagerHomePage() {
           </section>
         </div>
       </section>
-    </DashboardLayout>
   )
 }
 

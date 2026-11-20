@@ -115,3 +115,113 @@
     min-width: 480px;
   }
 }
+
+.accounts-panel__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.accounts-panel__heading h2 {
+  margin: 0;
+}
+
+.accounts-panel__refresh {
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.accounts-panel__refresh:hover:not(:disabled) {
+  background: var(--color-background);
+}
+
+.accounts-panel__refresh:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.accounts-panel__refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.accounts-panel__status {
+  padding: 24px 0;
+  color: #526660;
+}
+
+.accounts-table__role {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: #edf5f2;
+  color: #10594e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.accounts-table tbody tr:hover {
+  background: #f7faf9;
+}
+
+.accounts-table__actions-heading {
+  text-align: right;
+}
+
+.accounts-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.accounts-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border: 1px solid #dce7e3;
+  border-radius: 9px;
+  background: #f5faf7;
+  color: #10594e;
+  cursor: pointer;
+}
+
+.accounts-icon-button:hover:not(:disabled) {
+  background: #e2f0e9;
+  border-color: #aacbbd;
+}
+
+.accounts-icon-button--delete {
+  color: #b42318;
+  background: #fff7f6;
+  border-color: #f0d5d1;
+}
+
+.accounts-icon-button--delete:hover:not(:disabled) {
+  background: #fee4e2;
+  border-color: #e8aaa3;
+}
+
+.accounts-icon-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+.accounts-icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -10,14 +10,24 @@ import './CreateAccountPage.css'
 function CreateAccountPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [feedback, setFeedback] = useState(null)
-
+  const [busy, setBusy] = useState(false)
+  const [credentials, setCredentials] = useState(null)
   async function handleSubmit(event) {
     event.preventDefault()
+    if (busy) return
 
     const form = event.currentTarget
     const formData = new FormData(form)
+
     const name = String(formData.get('name') || '').trim()
-    const password = String(formData.get('temporaryPassword') || '')
+    const email = String(formData.get('email') || '').trim()
+    const role = String(formData.get('role') || '')
+    const temporaryPassword = String(
+      formData.get('temporaryPassword') || '',
+    )
+
+    setFeedback(null)
+    setCredentials(null)
 
     if (!name) {
       setFeedback({
@@ -28,24 +38,58 @@ function CreateAccountPage() {
       return
     }
 
-    const passwordError = validateTemporaryPassword(password)
+    const passwordError = validatePassword(temporaryPassword)
 
     if (passwordError) {
-      setFeedback({ variant: 'error', message: passwordError })
+      setFeedback({
+        variant: 'error',
+        message: passwordError,
+      })
       form.elements.namedItem('temporaryPassword').focus()
       return
     }
 
-    setFeedback({
-      variant: 'success',
-      message:
-        'Details are valid. No account has been saved.',
-    })
+    setBusy(true)
+
+    try {
+      const result = await postJson('/api/admin/users', {
+        name,
+        email,
+        role,
+        temporaryPassword,
+      })
+
+      if (!result?.user?._id) {
+        throw new Error(
+          'The server did not confirm the account. Check the account list before submitting again.',
+        )
+      }
+
+      form.reset()
+
+      setCredentials({
+        email: result.user.email,
+        password: result.temporaryPassword,
+      })
+
+      setFeedback({
+        variant: 'success',
+        message: 'Account created successfully.',
+      })
+    } catch (error) {
+      setFeedback({
+        variant: 'error',
+        message: error.message || 'Unable to create the account.',
+      })
+    } finally {
+      setBusy(false)
+    }
   }
 
   function handleReset() {
     setFeedback(null)
     setShowPassword(false)
+    setCredentials(null)
   }
 
   return (
@@ -138,6 +182,8 @@ function CreateAccountPage() {
           </div>
         )}
 
+        <TemporaryCredentials credentials={credentials} />
+
         <div className="account-form__actions">
           <Link
             className="button button--secondary"
@@ -145,7 +191,7 @@ function CreateAccountPage() {
           >
             Cancel
           </Link>
-          <button className="button button--secondary" type="reset">
+          <button className="button button--secondary" type="reset" disabled={busy}>
             Clear
           </button>
           <button className="button button--primary" type="submit" disabled={busy}>

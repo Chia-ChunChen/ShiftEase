@@ -9,14 +9,32 @@ function LoginPage({ onSignIn }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
-    const { email, password } = Object.fromEntries(new FormData(event.currentTarget))
+    if (busy) return
+
+    const values = new FormData(event.currentTarget)
+    const email = String(values.get('email') || '').trim()
+    const password = String(values.get('password') || '')
+
     setBusy(true)
     setError('')
+
     try {
-      const result = await postJson('/api/users/login', { email, password })
+      const result = await postJson('/api/users/login', {
+        email,
+        password,
+      })
+
+      const validRoles = ['Administrator', 'Manager', 'Employee']
+
+      if (!result?.user || !validRoles.includes(result.user.role)) {
+        throw new Error(
+          'The server did not return a valid user account.',
+        )
+      }
+
       onSignIn(result.user)
     } catch (error) {
-      setError(error.message)
+      setError(error.message || 'Unable to sign in.')
     } finally {
       setBusy(false)
     }

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { ROUTES } from '../../../app/routes.js'
 import FeedbackMessage from '../../../shared/components/FeedbackMessage.jsx'
 import { createEmployee } from '../services/employeeService.js'
+import TemporaryCredentials from '../../accounts/components/TemporaryCredentials.jsx'
 import './NewEmployeePage.css'
 
 const DRAFT_KEY = 'shiftease.newEmployeeDraft'
@@ -30,6 +31,22 @@ function readEmployeeDraft() {
     return draft
   } catch {
     return emptyEmployee()
+  }
+}
+
+function saveEmployeeDraft(employee) {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(employee))
+  } catch {
+    // The form remains usable when browser storage is unavailable.
+  }
+}
+
+function clearEmployeeDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY)
+  } catch {
+    // Browser storage must not interrupt a confirmed save.
   }
 }
 
@@ -71,6 +88,7 @@ function NewEmployeePage() {
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState(null)
   const [savedEmployee, setSavedEmployee] = useState(null)
+  const [credentials, setCredentials] = useState(null)
 
   function updateField(field, value) {
     const updated = {
@@ -79,14 +97,14 @@ function NewEmployeePage() {
     }
 
     setEmployee(updated)
-    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(updated))
+    saveEmployeeDraft(updated)
     setFeedback(null)
   }
 
   function handleCancel() {
     if (requestInProgress.current) return
 
-    sessionStorage.removeItem(DRAFT_KEY)
+    clearEmployeeDraft()
     navigate(ROUTES.MANAGER_HOME)
   }
 
@@ -106,7 +124,7 @@ function NewEmployeePage() {
 
     const labels = {
       name: 'Full name',
-      email: 'Email address',
+      email: 'Corporate email',
       phone: 'Phone number',
       position: 'Position',
     }
@@ -117,9 +135,18 @@ function NewEmployeePage() {
           variant: 'error',
           message: `${labels[field]} is required. Spaces alone are not accepted.`,
         })
-        form.elements.namedItem(field).focus()
+        form.elements.namedItem(field)?.focus()
         return
       }
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formattedEmployee.email)) {
+      setFeedback({
+        variant: 'error',
+        message: 'Enter a valid corporate email address.',
+      })
+      form.elements.namedItem('email')?.focus()
+      return
     }
 
     if (!isValidPhone(formattedEmployee.phone)) {
@@ -128,27 +155,46 @@ function NewEmployeePage() {
         message:
           'Enter a 10-digit phone number, for example (416) 555 - 0123. Use only digits, spaces, parentheses or hyphens.',
       })
-      form.elements.namedItem('phone').focus()
+      form.elements.namedItem('phone')?.focus()
       return
     }
 
     formattedEmployee.phone = formatPhone(formattedEmployee.phone)
 
     setEmployee(formattedEmployee)
-    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(formattedEmployee))
+    saveEmployeeDraft(formattedEmployee)
 
     requestInProgress.current = true
     setSaving(true)
     setFeedback(null)
+    setCredentials(null)
 
     try {
-      const created = await createEmployee(formattedEmployee)
+      const result = await createEmployee(formattedEmployee)
 
-      sessionStorage.removeItem(DRAFT_KEY)
-      setSavedEmployee(created)
+      if (!result?.data?._id) {
+        throw new Error(
+          'The server did not confirm the employee record. Check whether it was created before submitting again.',
+        )
+      }
+
+      clearEmployeeDraft()
+      setSavedEmployee(result.data)
+
+      setCredentials(
+        result.temporaryPassword
+          ? {
+              email: result.data.email,
+              password: result.temporaryPassword,
+            }
+          : null,
+      )
+
       setFeedback({
         variant: 'success',
-        message: `${created.name || formattedEmployee.name} was saved successfully.`,
+        message: result.temporaryPassword
+          ? 'Employee and login account created successfully.'
+          : 'Employee linked to the existing account. Its password was not changed.',
       })
     } catch (error) {
       setFeedback({
@@ -162,10 +208,11 @@ function NewEmployeePage() {
   }
 
   function handleCreateAnother() {
-    sessionStorage.removeItem(DRAFT_KEY)
+    clearEmployeeDraft()
     setEmployee(emptyEmployee())
     setSavedEmployee(null)
     setFeedback(null)
+    setCredentials(null)
 
     requestAnimationFrame(() => {
       nameInputRef.current?.focus()
@@ -180,8 +227,8 @@ function NewEmployeePage() {
         <p className="page-eyebrow">Team management</p>
         <h1 id="employee-page-title">Create employee</h1>
         <p>
-          Add the employee's contact and position details. All fields are
-          required.
+          Add the employee&apos;s contact and position details.
+          All fields are required.
         </p>
       </header>
 
@@ -201,10 +248,10 @@ function NewEmployeePage() {
               autoComplete="name"
               placeholder="ex. John Doe"
               value={employee.name}
-              onChange={(event) =>
+              onChange={event =>
                 updateField('name', event.target.value)
               }
-              onBlur={(event) =>
+              onBlur={event =>
                 updateField('name', formatTitleCase(event.target.value))
               }
               disabled={fieldsDisabled}
@@ -213,7 +260,7 @@ function NewEmployeePage() {
           </div>
 
           <div className="form-field">
-            <label htmlFor="employee-email">Email address</label>
+            <label htmlFor="employee-email">Corporate email</label>
             <input
               id="employee-email"
               name="email"
@@ -221,10 +268,10 @@ function NewEmployeePage() {
               autoComplete="email"
               placeholder="ex. john.doe@example.com"
               value={employee.email}
-              onChange={(event) =>
+              onChange={event =>
                 updateField('email', event.target.value)
               }
-              onBlur={(event) =>
+              onBlur={event =>
                 updateField('email', event.target.value.trim())
               }
               disabled={fieldsDisabled}
@@ -240,13 +287,13 @@ function NewEmployeePage() {
               type="tel"
               inputMode="tel"
               autoComplete="tel"
-              placeholder="ex. (555) 555 - 55555"
+              placeholder="ex. (416) 555 - 0123"
               aria-describedby="employee-phone-help"
               value={employee.phone}
-              onChange={(event) =>
+              onChange={event =>
                 updateField('phone', event.target.value)
               }
-              onBlur={(event) =>
+              onBlur={event =>
                 updateField('phone', formatPhone(event.target.value))
               }
               disabled={fieldsDisabled}
@@ -266,11 +313,14 @@ function NewEmployeePage() {
               autoComplete="organization-title"
               placeholder="ex. Cashier"
               value={employee.position}
-              onChange={(event) =>
+              onChange={event =>
                 updateField('position', event.target.value)
               }
-              onBlur={(event) =>
-                updateField('position', formatTitleCase(event.target.value))
+              onBlur={event =>
+                updateField(
+                  'position',
+                  formatTitleCase(event.target.value),
+                )
               }
               disabled={fieldsDisabled}
               required
@@ -285,6 +335,8 @@ function NewEmployeePage() {
             </FeedbackMessage>
           </div>
         )}
+
+        <TemporaryCredentials credentials={credentials} />
 
         <div className="employee-form__actions">
           {savedEmployee ? (
