@@ -2,7 +2,6 @@ import { useState } from 'react'
 import FeedbackMessage from '../shared/components/FeedbackMessage.jsx'
 import { postJson } from '../shared/services/apiClient.js'
 import './LoginPage.css'
-import { setAccessToken } from '../shared/services/apiClient.js'
 
 function LoginPage({ onSignIn }) {
   const [busy, setBusy] = useState(false)
@@ -15,7 +14,6 @@ function LoginPage({ onSignIn }) {
     setError('')
     try {
       const result = await postJson('/api/users/login', { email, password })
-      setAccessToken(result.token)
       onSignIn(result.user)
     } catch (error) {
       setError(error.message)
