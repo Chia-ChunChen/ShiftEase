@@ -29,9 +29,13 @@ const navigationByRole = {
 function DashboardLayout({ children, role, mustChangePassword, onSignOut }) {
   const [signingOut, setSigningOut] = useState(false)
   const [error, setError] = useState('')
-  const profile = { label: 'My profile', to: ROUTES.PROFILE }
-  const navigationItems = mustChangePassword ? [profile] : [...(navigationByRole[role] ?? []), profile]
-
+  const account = { label: 'Manage account', to: ROUTES.PROFILE }
+  const navigationItems = mustChangePassword
+    ? [account]
+    : role === ROLES.EMPLOYEE
+      ? navigationByRole[role]
+      : [...(navigationByRole[role] ?? []), account]
+      
   async function signOut() {
     setSigningOut(true)
     setError('')

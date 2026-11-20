@@ -9,5 +9,5 @@ export async function createEmployee(employee) {
     )
   }
 
-  return response.data
+  return response
 }
