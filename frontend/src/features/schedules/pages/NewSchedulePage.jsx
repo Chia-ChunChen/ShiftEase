@@ -4,7 +4,7 @@ import FeedbackMessage from '../../../shared/components/FeedbackMessage.jsx'
 import CalendarDatePicker from '../../../shared/components/CalendarDatePicker.jsx'
 import { getSchedules, createWeeklySchedule, getAvailableEmployees, assignEmployee,
   updateAssignment, removeAssignment, updateSchedule, publishSchedule } from '../services/scheduleService.js'
-import { copyDayHours, validHours, minutes } from '../scheduleRules.js'
+import { copyDayHours, filterUnsavedScheduleEntries, validHours, minutes } from '../scheduleRules.js'
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' })
@@ -185,21 +185,24 @@ function NewSchedulePage() {
   }
   async function saveDays() {
     if (operationRef.current || saveUncertain) return
-    const entries = selectedDates.map(shiftDate => ({ shiftDate, ...hours[shiftDate] }))
-    for (const entry of entries) {
+    const selectedEntries = selectedDates.map(shiftDate => ({ shiftDate, ...hours[shiftDate] }))
+    for (const entry of selectedEntries) {
       if (!validHours(entry)) { setFeedback({ variant: 'error', message: `${entry.shiftDate}: enter valid work hours.` }); return }
-      if (schedules.some(day => dayKey(day) === entry.shiftDate && day.startTime === entry.startTime && day.endTime === entry.endTime)) {
-        setFeedback({ variant: 'error', message: `${entry.shiftDate}: this work period is already saved. Select it on the right.` }); return
-      }
     }
-    if (!entries.length) return
+    const entries = filterUnsavedScheduleEntries(selectedEntries, schedules)
+    const skippedCount = selectedEntries.length - entries.length
+    if (!entries.length) {
+      setFeedback({ variant: 'error', message: 'All selected dates already have saved work days. Select an existing day on the right.' })
+      return
+    }
     operationRef.current = true; setBusy(true); setFeedback(null)
     try {
       const saved = await createWeeklySchedule(entries)
       setSchedules(current => [...current, ...saved]); setActiveId(saved[0]._id)
       setSelectedDates([]); setHours({}); setCopySource(''); setEditingDay(false)
       setAvailableVersion(value => value + 1)
-      setFeedback({ variant: 'success', message: `${saved.length} work day(s) saved. Add each employee's personal shift on the right.` })
+      const skippedMessage = skippedCount ? ` ${skippedCount} existing date(s) were skipped.` : ''
+      setFeedback({ variant: 'success', message: `${saved.length} work day(s) saved.${skippedMessage} Add each employee's personal shift on the right.` })
     } catch (error) {
       setSaveUncertain(true)
       setFeedback({ variant: 'error', message: `${error.message} Refresh saved days before retrying to check whether the batch was stored.` })
