@@ -38,6 +38,22 @@ async function getMyEmployeeProfile(req, res) {
   return employeeResponse(res, employee, "Employee profile retrieved successfully.");
 }
 
+async function updateMyPhoneNumber(req, res) {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body) ||
+      Object.keys(body).length !== 1 || !Object.prototype.hasOwnProperty.call(body, 'phone')) {
+    return res.status(400).json({ message: 'Only your phone number can be updated here.' });
+  }
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  if (!/^[0-9()\s-]+$/.test(phone) || phone.replace(/\D/g, '').length !== 10) {
+    return res.status(400).json({ message: 'Enter a 10-digit phone number without a country code.' });
+  }
+  const employee = await Employee.findOneAndUpdate(
+    { user: req.user._id }, { $set: { phone } }, { returnDocument: 'after', runValidators: true }
+  );
+  return employeeResponse(res, employee, 'Your phone number was updated successfully.');
+}
+
 async function getEmployeeProfile(req, res) {
   if (!mongoose.isObjectIdOrHexString(req.params.id)) {
     return res.status(400).json({ message: "Invalid employee ID." });
@@ -84,4 +100,4 @@ async function updateEmployeeProfile(req, res) {
   }
 }
 
-module.exports = { createEmployee, getAllEmployees, getMyEmployeeProfile, getEmployeeProfile, updateEmployeeProfile };
+module.exports = { createEmployee, getAllEmployees, getMyEmployeeProfile, updateMyPhoneNumber, getEmployeeProfile, updateEmployeeProfile };
