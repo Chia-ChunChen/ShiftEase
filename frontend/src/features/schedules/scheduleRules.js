@@ -16,6 +16,11 @@ export function copyDayHours(hours, source, targets, overwrite = false) {
   return result
 }
 
+export function filterUnsavedScheduleEntries(entries, schedules) {
+  const savedDates = new Set(schedules.map(day => String(day.shiftDate).slice(0, 10)))
+  return entries.filter(entry => !savedDates.has(entry.shiftDate))
+}
+
 export function minutes(time) {
   const [hours, value] = time.split(':').map(Number)
   return hours * 60 + value
