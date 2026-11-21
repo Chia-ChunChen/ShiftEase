@@ -7,6 +7,7 @@ const staff = allowRoles("Manager", "Administrator");
 
 router.use(requireSession);
 router.get("/me", allowRoles("Employee"), controller.getMyEmployeeProfile);
+router.patch('/me', allowRoles('Employee'), controller.updateMyPhoneNumber);
 router.get("/", staff, controller.getAllEmployees);
 router.get("/:id", staff, controller.getEmployeeProfile);
 router.put("/:id", staff, controller.updateEmployeeProfile);
